@@ -24,3 +24,8 @@ release.properties
 /mapbox.properties
 /runalyze.properties
 /dropbox.properties
+app/gradlew
+app/gradlew.bat
+app/java_pid11004.hprof
+app/gradle/wrapper/gradle-wrapper.jar
+app/gradle/wrapper/gradle-wrapper.properties

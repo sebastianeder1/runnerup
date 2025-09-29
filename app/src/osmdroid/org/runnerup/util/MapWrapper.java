@@ -22,6 +22,7 @@ import static org.runnerup.util.Formatter.Format.TXT_SHORT;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
+import android.graphics.Color;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import java.util.LinkedList;
@@ -120,6 +121,7 @@ public class MapWrapper implements Constants {
 
       route.map.setInfoWindow(null);
       route.map.getOutlinePaint().setStrokeWidth(10.f);
+      route.map.getOutlinePaint().setColor(Color.RED);
       LocationEntity.LocationList<LocationEntity> ll = new LocationEntity.LocationList<>(mDB, mID);
       List<GeoPoint> points = new LinkedList<>();
       int lastLap = -1;
