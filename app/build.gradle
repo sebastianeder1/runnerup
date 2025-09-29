@@ -1,8 +1,6 @@
 apply plugin: 'com.android.application'
 
-def getGitHash = providers.exec {
-    commandLine('git', 'rev-parse', '--short', 'HEAD')
-}.standardOutput.asText.get().strip()
+def getGitHash = "my"
 
 android {
     buildToolsVersion = rootProject.ext.buildToolsVersion
@@ -75,24 +73,26 @@ android {
 
     signingConfigs {
         //noinspection GroovyMissingReturnStatement
-        release {
-        }
+        //release {
+        //}
     }
 
     buildTypes {
         debug {
             // Separate the debug build, sync with common/build.gradle
             applicationIdSuffix ".debug"
-            versionNameSuffix = "-${getGitHash}"
+            versionNameSuffix = "-my"
         }
         release {
-            debuggable false
+            debuggable true
+            minifyEnabled false
             applicationIdSuffix ""
 
-            minifyEnabled rootProject.ext.allowNonFree
-            shrinkResources rootProject.ext.allowNonFree
+            //minifyEnabled rootProject.ext.allowNonFree
+            //shrinkResources rootProject.ext.allowNonFree
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard.txt'
-            signingConfig signingConfigs.release
+            signingConfig signingConfigs.debug
+
         }
     }
     lint {
@@ -203,15 +203,17 @@ allprojects {
 
 def props = new Properties()
 if (rootProject.file("release.properties").exists()) {
-    props.load(new FileInputStream(rootProject.file("release.properties")))
+    //props.load(new FileInputStream(rootProject.file("release.properties")))
 
-    android.signingConfigs.release.storeFile rootProject.file(props.keyStore)
-    android.signingConfigs.release.storePassword props.keyStorePassword
-    android.signingConfigs.release.keyAlias props.keyAlias
-    android.signingConfigs.release.keyPassword props.keyAliasPassword
+    //android.signingConfigs.release.storeFile rootProject.file(props.keyStore)
+    //android.signingConfigs.release.storePassword props.keyStorePassword
+    //android.signingConfigs.release.keyAlias props.keyAlias
+    //android.signingConfigs.release.keyPassword props.keyAliasPassword
+    //android.buildTypes.release.signingConfig = null
+
 } else {
     project.logger.info('INFO: Set the values storeFile, storePassword, keyAlias, and keyPassword in release.properties to sign the release.')
-    android.buildTypes.release.signingConfig = null
+    //android.buildTypes.release.signingConfig = null
 }
 
 android.applicationVariants.configureEach {
@@ -285,4 +287,11 @@ android.applicationVariants.configureEach { variant ->
                     baseAbiVersionCode * 10000 + variant.versionCode
         }
     }
+}
+
+task wrapper(type: Wrapper){
+    gradleVersion = '7.2'
+}
+task prepareKotlinBuildScriptModel {
+
 }

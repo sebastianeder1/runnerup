@@ -1,7 +1,7 @@
 apply plugin: 'com.android.library'
 
 android {
-    namespace 'org.runnerup'
+    namespace 'org.runnerup.free'
     compileSdk rootProject.ext.compileSdk
     buildToolsVersion rootProject.ext.buildToolsVersion
 
@@ -21,16 +21,18 @@ android {
             debug {
                 // The applicationId for the Android app (needed in Wear app)
                 // This must be unique to allow Notification button intents to work independently
-                buildConfigField ('String', 'applicationIdFull', '"' + rootProject.ext.applicationId + '.debug"')
-                resValue "string", "applicationIdFull", rootProject.ext.applicationId + ".debug"
-                resValue "string", "app_name", "dRunnerUp"
+                //buildConfigField ('String', 'applicationIdFull', '"' + rootProject.ext.applicationId + '.debug"')
+                //resValue "string", "applicationIdFull", rootProject.ext.applicationId + ".debug"
+                buildConfigField ('String', 'applicationIdFull', '"' + rootProject.ext.applicationId + '"')
+                resValue "string", "applicationIdFull", rootProject.ext.applicationId
+                //resValue "string", "app_name", "RunnerUp"
             }
             release {
-                debuggable false
+                debuggable true
                 buildConfigField ('String', 'applicationIdFull', '"' + rootProject.ext.applicationId + '"')
                 resValue "string", "applicationIdFull", rootProject.ext.applicationId
 
-                minifyEnabled false
+                //minifyEnabled false
             }
         }
     }
