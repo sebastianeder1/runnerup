@@ -38,6 +38,7 @@ import org.runnerup.workout.feedback.AudioCountdownFeedback;
 import org.runnerup.workout.feedback.AudioFeedback;
 import org.runnerup.workout.feedback.CoachFeedback;
 import org.runnerup.workout.feedback.CountdownFeedback;
+import org.runnerup.workout.feedback.GadgetBridgeBroadcastFeedback;
 import org.runnerup.workout.feedback.HRMStateChangeFeedback;
 
 public class WorkoutBuilder {
@@ -560,6 +561,7 @@ public class WorkoutBuilder {
     // create a list trigger for the values
     ListTrigger trigger = new ListTrigger(step.getDurationType(), Scope.STEP, list);
     trigger.triggerAction.add(new AudioCountdownFeedback(Scope.STEP, step.getDurationType()));
+    trigger.triggerAction.add(new GadgetBridgeBroadcastFeedback("RunnerUp","Countdown",step.getName()));
     step.triggers.add(trigger);
   }
 
@@ -749,6 +751,7 @@ public class WorkoutBuilder {
     if (prefs.getBoolean(res.getString(R.string.cueinfo_current_cad), false)) {
       feedback.add(new AudioFeedback(Scope.CURRENT, Dimension.CAD));
     }
+    //feedback.add(new GadgetBridgeBroadcastFeedback("RunnerUp","Current Trigger","Message"));
 
     for (int i = feedbackStart; i < feedback.size(); i++) {
       if (feedback.get(i) instanceof AudioFeedback

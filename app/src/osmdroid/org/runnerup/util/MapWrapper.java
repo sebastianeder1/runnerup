@@ -23,6 +23,7 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Color;
+import android.health.connect.datatypes.HeartRateRecord;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import java.util.LinkedList;
@@ -80,12 +81,17 @@ public class MapWrapper implements Constants {
     Route(Context context, MapView mapView) {
       this.context = context;
       this.mapView = mapView;
-      this.map = new Polyline(mapView, true);
+      this.maps = new ArrayList<>();//Polyline(mapView, true);
+    }
+    public Polyline addMap(){
+      Polyline pl = new Polyline(this.mapView,true);
+      maps.add(pl);
+      return pl;
     }
 
     final Context context;
     final MapView mapView;
-    final Polyline map;
+    final List<Polyline> maps;
     List<Marker> markers = new ArrayList<>(2);
   }
 
@@ -118,14 +124,40 @@ public class MapWrapper implements Constants {
       SQLiteDatabase mDB = params[0].mDB;
       long mID = params[0].mID;
       IMapController iMapController = params[0].iMapController;
-
-      route.map.setInfoWindow(null);
-      route.map.getOutlinePaint().setStrokeWidth(10.f);
-      route.map.getOutlinePaint().setColor(Color.RED);
       LocationEntity.LocationList<LocationEntity> ll = new LocationEntity.LocationList<>(mDB, mID);
-      List<GeoPoint> points = new LinkedList<>();
+
+      List<GeoPoint> points  = new LinkedList<>();
+      LocationEntity previousLocationEntity = null;
+      LocationEntity lastLocationEntityOfPriviousIterate = null;
+
+      Polyline currentMap = null;
+
       int lastLap = -1;
+      int cursor = 0;
       for (LocationEntity loc : ll) {
+
+        if(cursor % 10 == 0) {
+          if(currentMap != null && !points.isEmpty()) {
+            //lastPointOfOldList = points.get(points.size()-1); this is previousLocationEntity
+            double distanceOfCurrentIterate = previousLocationEntity.getDistance()-lastLocationEntityOfPriviousIterate.getDistance();
+            long elapsedTimeOfCurrentIterate = previousLocationEntity.getElapsed()-lastLocationEntityOfPriviousIterate.getElapsed();
+            double speedOfCurrentIterate = 1000*distanceOfCurrentIterate/elapsedTimeOfCurrentIterate; //x1000 due to time is in ms instead seconds
+            currentMap.getOutlinePaint().setColor(getMapColorForSpeed(speedOfCurrentIterate));
+            currentMap.setPoints(points);
+            lastLocationEntityOfPriviousIterate=previousLocationEntity;
+          }
+          points = new LinkedList<>();
+          if(previousLocationEntity != null)
+            points.add(new GeoPoint(previousLocationEntity.getLatitude(),previousLocationEntity.getLongitude()));
+          currentMap = route.addMap();
+
+          currentMap.setInfoWindow(null);
+          currentMap.getOutlinePaint().setStrokeWidth(7.f);
+        }
+
+        if(lastLocationEntityOfPriviousIterate == null)
+          lastLocationEntityOfPriviousIterate = loc; //set last LocationEntity of previous iterate to first entity if no previous exist (time and distance = 0)
+
         GeoPoint point = new GeoPoint(loc.getLatitude(), loc.getLongitude());
         points.add(point);
 
@@ -144,9 +176,10 @@ public class MapWrapper implements Constants {
           marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
           route.markers.add(marker);
         }
+        previousLocationEntity = loc;
+        cursor++;
       }
       ll.close();
-      route.map.setPoints(points);
 
       if (!points.isEmpty()) {
         iMapController.setCenter(points.get(0));
@@ -154,16 +187,22 @@ public class MapWrapper implements Constants {
 
       return route;
     }
-
+    private int getMapColorForSpeed(double speed){
+      if(speed < 2.4)  return Color.GREEN;
+      else if(speed < 2.8) return Color.BLUE;
+      else if (speed < 3.2) return Color.YELLOW;
+      else if (speed < 3.6) return Color.RED;
+      return Color.MAGENTA;
+    }
     @Override
     protected void onPostExecute(Route route) {
 
-      if (route != null && route.map != null && route.markers != null) {
+      if (route != null && !route.maps.isEmpty() && route.markers != null) {
         for (Marker marker : route.markers) {
           route.mapView.getOverlays().add(marker);
         }
-
-        route.mapView.getOverlays().add(route.map);
+        for(Polyline map :route.maps)
+          route.mapView.getOverlays().add(map);
         //Log.v(getClass().getName(), "Added " + route.markers.size() + " markers");
       }
     }

@@ -50,6 +50,7 @@
   <string name="Device">Device</string>
   <string name="Start_hour">Start hour</string>
   <string name="Heart_rate">Heart rate</string>
+  <string name="Altitude">Altitude</string>
   <string name="Pace">Pace</string>
   <string name="Scan">Scan</string>
   <string name="Connect">Connect</string>
