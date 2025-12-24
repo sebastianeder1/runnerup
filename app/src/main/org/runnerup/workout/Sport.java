@@ -90,7 +90,29 @@ public enum Sport {
   public static String textOf(int dbValue) {
     return textOf(null, dbValue);
   }
-
+  public static String endurainIdOf(int dbValue){
+    switch(dbValue)
+    {
+      case 0: //running
+        return "1"; //run
+      case 1: //biking
+        return "4"; //road cycling
+      case 2: //other
+        return "10"; //general workout
+      case 3: //orienteering
+        return "2"; //trail run
+      case 4: //walking
+        return "11"; //walk
+      case 5: //treadmill
+        return "40"; //treadmill run
+      case 6: //gym
+        return "10"; //general workout
+      case 7: //stationary bike / max
+        return "28"; //indoor cycling
+      default:
+        return "10";//general workout
+    }
+  }
   public static String textOf(Resources res, int dbValue) {
     String sportName = null;
     if (res != null) {

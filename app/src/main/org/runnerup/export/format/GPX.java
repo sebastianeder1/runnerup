@@ -122,6 +122,16 @@ public class GPX {
 
       mXML.text("RunnerUp-" + sportName + "-" + time);
       mXML.endTag("", "name");
+
+      //mXML.startTag("", "type");
+      //String sportType;
+      //if(cursor.isNull(3))
+        //  sportType="10";
+      //else
+        //  sportType=Sport.endurainIdOf(cursor.getInt(3));
+      //mXML.text(sportType);
+      //mXML.endTag("", "type");
+
       if (!cursor.isNull(1)) {
         String notes = cursor.getString(1);
         mXML.startTag("", "desc");
