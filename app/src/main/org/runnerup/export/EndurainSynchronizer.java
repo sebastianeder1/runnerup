@@ -99,11 +99,8 @@ public class EndurainSynchronizer extends DefaultSynchronizer {
     if (authToken != null) {
       try {
         JSONObject tmp = new JSONObject(authToken);
-        //noinspection ConstantConditions
         username = tmp.optString("username", null);
-        //noinspection ConstantConditions
         password = tmp.optString("password", null);
-        //noinspection ConstantConditions
         url = tmp.optString("url", null);
         hasCorrectConfig = tmp.optBoolean("hasCorrectConfig", false);
       } catch (JSONException e) {
@@ -170,10 +167,7 @@ public class EndurainSynchronizer extends DefaultSynchronizer {
     try {
       OkHttpClient client = getAuthClient();
       RequestBody formBody =
-          new FormBody.Builder()
-              .add("username", username)
-              .add("password", password)
-              .build();
+          new FormBody.Builder().add("username", username).add("password", password).build();
 
       Request request = new Request.Builder().url(url + TOKEN_URL_PATH).post(formBody).build();
 
@@ -263,7 +257,7 @@ public class EndurainSynchronizer extends DefaultSynchronizer {
                   "file",
                   (fileBase.replace("/", "") + fileExt),
                   RequestBody.create(
-                      MediaType.parse("application/" + fileExt + "+xml"), writer.toString()))
+                      writer.toString(), MediaType.parse("application/" + fileExt + "+xml")))
               .build();
 
       Request request =

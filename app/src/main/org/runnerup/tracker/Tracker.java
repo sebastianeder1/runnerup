@@ -18,6 +18,7 @@
 package org.runnerup.tracker;
 
 import android.annotation.SuppressLint;
+import android.app.Service;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
@@ -25,15 +26,18 @@ import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.database.sqlite.SQLiteDatabase;
 import android.location.Location;
-import android.location.LocationListener;
+import android.os.Binder;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.os.SystemClock;
 import android.util.Log;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
+import androidx.core.location.LocationListenerCompat;
 import androidx.preference.PreferenceManager;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -57,7 +61,6 @@ import org.runnerup.tracker.component.TrackerComponentCollection;
 import org.runnerup.tracker.component.TrackerElevation;
 import org.runnerup.tracker.component.TrackerGPS;
 import org.runnerup.tracker.component.TrackerHRM;
-import org.runnerup.tracker.component.TrackerPebble;
 import org.runnerup.tracker.component.TrackerPressure;
 import org.runnerup.tracker.component.TrackerReceiver;
 import org.runnerup.tracker.component.TrackerTTS;
@@ -77,12 +80,12 @@ import org.runnerup.workout.Workout;
  *
  * @author jonas.oreland@gmail.com
  */
-public class Tracker extends android.app.Service implements LocationListener, Constants {
+public class Tracker extends Service implements LocationListenerCompat, Constants {
   // Max age for current data to be considered valid
   private static final int MAX_CURRENT_AGE = 15000;
   private static final long NANO_IN_MILLI = 1000000;
 
-  private final Handler handler = new Handler();
+  private final Handler handler = new Handler(Looper.getMainLooper());
 
   private final TrackerComponentCollection components = new TrackerComponentCollection();
   // Some trackers may select separate sensors depending on sport, handled in onBind()
@@ -102,8 +105,6 @@ public class Tracker extends android.app.Service implements LocationListener, Co
       (TrackerReceiver) components.addComponent(new TrackerReceiver(this));
   private final TrackerWear trackerWear =
       (TrackerWear) components.addComponent(new TrackerWear(this));
-  private final TrackerPebble trackerPebble =
-      (TrackerPebble) components.addComponent(new TrackerPebble(this));
 
   private boolean mTimeFromGpsPoints = false;
   private boolean mCurrentSpeedFromGpsPoints = false;
@@ -129,6 +130,14 @@ public class Tracker extends android.app.Service implements LocationListener, Co
   private SQLiteDatabase mDB = null;
   private PersistentGpsLoggerListener mDBWriter = null;
   private PowerManager.WakeLock mWakeLock = null;
+
+  public SQLiteDatabase getDatabase() {
+    if (mDB == null) {
+      mDB = DBHelper.getWritableDatabase(this);
+    }
+    return mDB;
+  }
+
   private final List<WorkoutObserver> liveLoggers = new ArrayList<>();
 
   private Workout workout = null;
@@ -206,7 +215,7 @@ public class Tracker extends android.app.Service implements LocationListener, Co
             state.set(TrackerState.INITIALIZED);
           }
 
-          Log.e(getClass().getName(), "state.set(" + getState() + ")");
+          Log.d(getClass().getName(), "state.set(" + getState() + ")");
           handleNextState();
         }
       };
@@ -251,14 +260,14 @@ public class Tracker extends android.app.Service implements LocationListener, Co
   }
 
   public void connect() {
-    Log.e(getClass().getName(), "Tracker.connect() - state: " + state.get());
+    Log.d(getClass().getName(), "Tracker.connect() - state: " + state.get());
     switch (state.get()) {
       case INIT:
         setup();
       case INITIALIZING:
       case CLEANUP:
         nextState = TrackerState.CONNECTED;
-        Log.e(getClass().getName(), " => nextState: " + nextState);
+        Log.d(getClass().getName(), " => nextState: " + nextState);
         return;
       case INITIALIZED:
         break;
@@ -321,7 +330,7 @@ public class Tracker extends android.app.Service implements LocationListener, Co
       tmp.put(DB.LOCATION.LAP, 0); // always start with lap 0
       mDBWriter = new PersistentGpsLoggerListener(mDB, DB.LOCATION.TABLE, tmp, logGpxAccuracy);
     } catch (IllegalStateException ex) {
-      Log.e(getClass().getName(), "Query failed:", ex);
+      Log.i(getClass().getName(), "Query failed:", ex);
     }
     return mActivityId;
   }
@@ -341,9 +350,6 @@ public class Tracker extends android.app.Service implements LocationListener, Co
     // Add Wear to live loggers if it's active
     if (components.getResultCode(TrackerWear.NAME) == TrackerComponent.ResultCode.RESULT_OK)
       liveLoggers.add(trackerWear);
-
-    if (components.getResultCode(TrackerPebble.NAME) == TrackerComponent.ResultCode.RESULT_OK)
-      liveLoggers.add(trackerPebble);
 
     // create the DB activity
     createActivity(workout.getSport());
@@ -426,7 +432,7 @@ public class Tracker extends android.app.Service implements LocationListener, Co
     // This saves a PAUSE location
     internalOnLocationChanged(mLastLocationStarted);
 
-    saveActivity(/* manualDistance= */null);
+    saveActivity(/* manualDistance= */ null);
     components.onPause();
   }
 
@@ -455,7 +461,7 @@ public class Tracker extends android.app.Service implements LocationListener, Co
     // This saves a PAUSE location
     internalOnLocationChanged(mLastLocationStarted);
 
-    saveActivity(/* manualDistance= */null);
+    saveActivity(/* manualDistance= */ null);
     components.onPause(); // TODO add new callback for this
   }
 
@@ -560,7 +566,12 @@ public class Tracker extends android.app.Service implements LocationListener, Co
       ContentValues tmp = new ContentValues();
       tmp.put("deleted", 1);
       String[] key = {Long.toString(mActivityId)};
-      mDB.update(DB.ACTIVITY.TABLE, tmp, "_id = ?", key);
+
+      if (mDB == null) {
+        Log.e("Tracker", "completeActivity called but mDB is null");
+      } else {
+        mDB.update(DB.ACTIVITY.TABLE, tmp, "_id = ?", key);
+      }
       liveLog(DB.LOCATION.TYPE_DISCARD);
     }
 
@@ -570,17 +581,23 @@ public class Tracker extends android.app.Service implements LocationListener, Co
   }
 
   private void saveActivity(Double manualDistance) {
+    if (mDB == null) {
+      mDB = DBHelper.getWritableDatabase(this);
+    }
+    if (mDB == null) {
+      Log.e("Tracker", "saveActivity: mDB is still null after attempting to reopen");
+      return;
+    }
     ContentValues tmp = new ContentValues();
     if (mHeartbeatNanos > 0) {
       long avgHR = Math.round(60 * mHeartbeats * 1000 * NANO_IN_MILLI / mHeartbeatNanos); // BPM
-      tmp.put(Constants.DB.ACTIVITY.AVG_HR, avgHR);
+      tmp.put(DB.ACTIVITY.AVG_HR, avgHR);
     }
-    if (mMaxHR > 0) tmp.put(Constants.DB.ACTIVITY.MAX_HR, mMaxHR);
+    if (mMaxHR > 0) tmp.put(DB.ACTIVITY.MAX_HR, mMaxHR);
 
     if (TrackerPressure.isAvailable(this)) {
       final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-      boolean enabled =
-          prefs.getBoolean(this.getString(org.runnerup.R.string.pref_use_pressure_sensor), false);
+      boolean enabled = prefs.getBoolean(this.getString(R.string.pref_use_pressure_sensor), false);
       if (enabled) {
         // Save information about barometer usage, used in uploads (like Strava)
         tmp.put(DB.ACTIVITY.META_DATA, DB.ACTIVITY.WITH_BAROMETER);
@@ -588,12 +605,12 @@ public class Tracker extends android.app.Service implements LocationListener, Co
     }
 
     if (manualDistance != null) {
-      tmp.put(Constants.DB.ACTIVITY.DISTANCE, manualDistance);
+      tmp.put(DB.ACTIVITY.DISTANCE, manualDistance);
     } else {
-      tmp.put(Constants.DB.ACTIVITY.DISTANCE, mElapsedDistance);
+      tmp.put(DB.ACTIVITY.DISTANCE, mElapsedDistance);
     }
     tmp.put(
-        Constants.DB.ACTIVITY.TIME,
+        DB.ACTIVITY.TIME,
         Math.round(getTimeMs() / 1000.0d)); // time should be updated last for conditionalRecompute
 
     String[] key = {Long.toString(mActivityId)};
@@ -601,6 +618,10 @@ public class Tracker extends android.app.Service implements LocationListener, Co
   }
 
   private void setNextLocationType(int newType) {
+    if (mDBWriter == null) {
+      Log.w("Tracker", "setNextLocationType: mDBWriter is null (newType=" + newType + ")");
+      return;
+    }
     ContentValues key = mDBWriter.getKey();
     key.put(DB.LOCATION.TYPE, newType);
     mDBWriter.setKey(key);
@@ -732,7 +753,9 @@ public class Tracker extends android.app.Service implements LocationListener, Co
   @Override
   public void onProviderEnabled(@NonNull String arg0) {}
 
+  // Before Android Q
   @Override
+  @SuppressWarnings("deprecation")
   public void onStatusChanged(String arg0, int arg1, Bundle arg2) {}
 
   public TrackerState getState() {
@@ -748,7 +771,7 @@ public class Tracker extends android.app.Service implements LocationListener, Co
   }
 
   // Service interface stuff...
-  public class LocalBinder extends android.os.Binder {
+  public class LocalBinder extends Binder {
     public Tracker getService() {
       return Tracker.this;
     }
@@ -770,7 +793,7 @@ public class Tracker extends android.app.Service implements LocationListener, Co
       mWakeLock = null;
     }
     if (get) {
-      PowerManager pm = (PowerManager) this.getSystemService(Context.POWER_SERVICE);
+      PowerManager pm = ContextCompat.getSystemService(this, PowerManager.class);
       mWakeLock =
           Objects.requireNonNull(pm)
               .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "RunnerUp:wakeLock");

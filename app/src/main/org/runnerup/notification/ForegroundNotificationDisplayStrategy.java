@@ -16,25 +16,40 @@ public class ForegroundNotificationDisplayStrategy implements NotificationDispla
     this.service = service;
   }
 
+  private boolean isForeground = false;
+
   @Override
   public void notify(int notificationId, Notification notification) {
-    int type = 0;
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-      if (ContextCompat.checkSelfPermission(service, Manifest.permission.ACCESS_FINE_LOCATION)
-          == PackageManager.PERMISSION_GRANTED) {
-        type = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION;
+    if (!isForeground) {
+      int type = 0;
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        if (ContextCompat.checkSelfPermission(service, Manifest.permission.ACCESS_FINE_LOCATION)
+            == PackageManager.PERMISSION_GRANTED) {
+          type = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
+            && ContextCompat.checkSelfPermission(service, Manifest.permission.ACTIVITY_RECOGNITION)
+                == PackageManager.PERMISSION_GRANTED) {
+          type |= ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH;
+        }
       }
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
-          && ContextCompat.checkSelfPermission(service, Manifest.permission.ACTIVITY_RECOGNITION)
-              == PackageManager.PERMISSION_GRANTED) {
-        type |= ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH;
-      }
+      ServiceCompat.startForeground(service, notificationId, notification, type);
+      isForeground = true;
+    } else {
+      android.app.NotificationManager notificationManager =
+          ContextCompat.getSystemService(service, android.app.NotificationManager.class);
+      notificationManager.notify(notificationId, notification);
     }
-    ServiceCompat.startForeground(service, notificationId, notification, type);
   }
 
   @Override
   public void cancel(int notificationId) {
+    isForeground = false;
     ServiceCompat.stopForeground(service, ServiceCompat.STOP_FOREGROUND_REMOVE);
+    // Updates after the first are posted with notify(), and the service may already have
+    // left the foreground (RunActivity.doStop), so remove the notification explicitly too.
+    android.app.NotificationManager notificationManager =
+        ContextCompat.getSystemService(service, android.app.NotificationManager.class);
+    notificationManager.cancel(notificationId);
   }
 }

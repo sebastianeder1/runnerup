@@ -27,8 +27,12 @@ import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.location.LocationManagerCompat;
+import androidx.core.location.LocationRequestCompat;
 import androidx.preference.PreferenceManager;
 import org.runnerup.R;
 import org.runnerup.tracker.GpsStatus;
@@ -60,7 +64,7 @@ public class TrackerGPS extends DefaultTrackerComponent implements TickListener 
   @Override
   public ResultCode onInit(final Callback callback, Context context) {
     try {
-      LocationManager lm = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
+      LocationManager lm = ContextCompat.getSystemService(context, LocationManager.class);
       if (lm == null) {
         return ResultCode.RESULT_NOT_SUPPORTED;
       }
@@ -72,7 +76,7 @@ public class TrackerGPS extends DefaultTrackerComponent implements TickListener 
       return ResultCode.RESULT_OK;
     }
     try {
-      if (locationManager.getProvider(LocationManager.GPS_PROVIDER) == null) {
+      if (!LocationManagerCompat.hasProvider(locationManager, GPS_PROVIDER)) {
         return ResultCode.RESULT_NOT_SUPPORTED;
       }
     } catch (Exception ex) {
@@ -108,18 +112,26 @@ public class TrackerGPS extends DefaultTrackerComponent implements TickListener 
     String s = preferences.getString(context.getString(resId), def);
     if (TextUtils.isEmpty(s)) {
       // Update the settings
-      SharedPreferences.Editor prefedit = preferences.edit();
-      prefedit.putString(context.getString(resId), def);
-      prefedit.apply();
+      SharedPreferences.Editor prefs = preferences.edit();
+      prefs.putString(context.getString(resId), def);
+      prefs.apply();
       s = def;
     }
     return Integer.parseInt(s);
   }
 
-  static Location getLastKnownLocation(LocationManager lm) {
+  private static Location getLastKnownLocation(LocationManager lm, Context context) {
     String[] list = {GPS_PROVIDER, NETWORK_PROVIDER, PASSIVE_PROVIDER};
     Location lastLocation = null;
     for (String s : list) {
+      if (s.equals(GPS_PROVIDER)
+          && (ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+                  != PackageManager.PERMISSION_GRANTED
+              && ActivityCompat.checkSelfPermission(
+                      context, Manifest.permission.ACCESS_COARSE_LOCATION)
+                  != PackageManager.PERMISSION_GRANTED)) {
+        continue;
+      }
       Location tmp = lm.getLastKnownLocation(s);
       if (tmp == null) {
         continue;
@@ -144,9 +156,9 @@ public class TrackerGPS extends DefaultTrackerComponent implements TickListener 
 
   @Override
   public ResultCode onConnecting(final Callback callback, Context context) {
-    if (mWithoutGps == false &&
-        ContextCompat.checkSelfPermission(this.tracker, Manifest.permission.ACCESS_FINE_LOCATION)
-        != PackageManager.PERMISSION_GRANTED) {
+    if (!mWithoutGps
+        && ContextCompat.checkSelfPermission(this.tracker, Manifest.permission.ACCESS_FINE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED) {
       mWithoutGps = true;
     }
 
@@ -154,11 +166,16 @@ public class TrackerGPS extends DefaultTrackerComponent implements TickListener 
       var lm = locationManager;
       SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
       frequency_ms = parseAndFixInteger(preferences, R.string.pref_pollInterval, "1000", context);
-      mLastLocation = getLastKnownLocation(lm);
+      mLastLocation = getLastKnownLocation(locationManager, context);
       if (!mWithoutGps) {
         Integer frequency_meters =
             parseAndFixInteger(preferences, R.string.pref_pollDistance, "0", context);
-        lm.requestLocationUpdates(GPS_PROVIDER, frequency_ms, frequency_meters, tracker);
+        LocationRequestCompat locationRequest =
+            new LocationRequestCompat.Builder(frequency_ms)
+                .setMinUpdateDistanceMeters(frequency_meters)
+                .build();
+        LocationManagerCompat.requestLocationUpdates(
+            lm, GPS_PROVIDER, locationRequest, ContextCompat.getMainExecutor(context), tracker);
         mGpsStatus = new GpsStatus(context);
         mGpsStatus.start(this);
         mConnectCallback = callback;
@@ -181,9 +198,9 @@ public class TrackerGPS extends DefaultTrackerComponent implements TickListener 
   private void stopGps() {
     if (locationManager != null) {
       try {
-        locationManager.removeUpdates(tracker);
-      } catch (Exception ex) {
-        ex.printStackTrace();
+        LocationManagerCompat.removeUpdates(locationManager, tracker);
+      } catch (SecurityException ex) {
+        // Ignore if user turn off GPS
       }
       locationManager = null;
     }
@@ -209,7 +226,7 @@ public class TrackerGPS extends DefaultTrackerComponent implements TickListener 
     // increased higher than we started.
     int onEndCounter = 0;
 
-    final Handler handler = new Handler();
+    final Handler handler = new Handler(Looper.getMainLooper());
 
     public void start(int onEndCounter) {
       this.onEndCounter = onEndCounter;
@@ -239,14 +256,13 @@ public class TrackerGPS extends DefaultTrackerComponent implements TickListener 
       tracker.onLocationChanged(location);
       handler.postDelayed(this, frequency_ms);
     }
-  };
+  }
 
-  private final GpsLessLocationProvider gpsLessLocationProvider =
-      new GpsLessLocationProvider();
+  private final GpsLessLocationProvider gpsLessLocationProvider = new GpsLessLocationProvider();
 
   @Override
   public void onTick() {
-    if (mWithoutGps == false) {
+    if (!mWithoutGps) {
       if (mGpsStatus == null) {
         return;
       }
@@ -262,8 +278,10 @@ public class TrackerGPS extends DefaultTrackerComponent implements TickListener 
 
     Callback tmp = mConnectCallback;
     mConnectCallback = null;
-    mGpsStatus.stop(this);
-    // note: Don't reset mGpsStatus, it's used for isConnected()
+    if (mGpsStatus != null) {
+      mGpsStatus.stop(this);
+      // note: Don't reset mGpsStatus, it's used for isConnected()
+    }
 
     tmp.run(this, ResultCode.RESULT_OK);
   }

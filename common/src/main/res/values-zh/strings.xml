@@ -312,8 +312,6 @@
   <string name="use_temperature_sensor">温度传感器</string>
   <string name="use_pressure_sensor_title">气压传感器</string>
   <string name="use_pressure_sensor_summary">使用气压计计算海拔</string>
-  <string name="adjust_barometer_altitude_from_gps">使用气压计修正GPS海拔</string>
-  <string name="adjust_barometer_elevation_from_gps_summary">使用初始GPS海拔来平均气压计海拔</string>
   <string name="channel_notification_ongoing">RunnerUp GPS和运动通知</string>
   <string name="Lap_start">分段开始</string>
   <string name="Lap_start_summary">在记圈开始、开始活动、热身、冷身时语音提示</string>
@@ -338,14 +336,10 @@
   <!--Preference categories & summaries-->
   <string name="GPS_category">GPS</string>
   <string name="HRM_category">心率</string>
-  <string name="Lock_activity_buttons_category">锁定按钮</string>
   <string name="GPS_recording_category">GPS记录</string>
   <string name="Phone_sensors_category">手机传感器</string>
   <string name="Database_category">数据库维护</string>
-  <string name="Maintenance_explanation_summary">RunnerUp会把训练数据保存到一个SQL数据库。\n为了维护，可以把runnerup.db.export文件从\n%1$s导入/导出</string>
   <string name="Map_pref_summary">地图风格</string>
-  <string name="Controls">控制</string>
-  <string name="Controls_pref_summary">锁定按钮</string>
   <string name="Workout_pref_summary">管理训练、分段、休息、虚拟兔子</string>
   <string name="Manage_workouts_category">高级训练</string>
   <string name="Autolap_category">自动分段</string>
@@ -358,4 +352,5 @@
   <string name="Current_speed_from_GPS_points_summary">使用GPS传感器获取速度而非根据GPS位置计算速度</string>
   <string name="Target_coaching_summary">设置计算目标反馈的移动平均值的周期和音频提示的宽限期</string>
   <string name="Activity_ongoing">运动开始</string>
+  <!--Name of sports, these deprecate array.sportEntries-->
 </resources>

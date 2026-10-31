@@ -24,7 +24,6 @@ import android.content.res.Resources;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
@@ -32,6 +31,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.view.Window;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
@@ -42,9 +42,13 @@ import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
 import android.widget.Toast;
+import androidx.activity.EdgeToEdge;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.content.res.AppCompatResources;
+import androidx.core.view.WindowCompat;
 import androidx.preference.PreferenceManager;
 import java.util.ArrayList;
 import org.runnerup.R;
@@ -68,14 +72,20 @@ public class AccountActivity extends AppCompatActivity implements Constants {
   private FileFormats format;
   private SyncManager syncManager = null;
   private EditText mRunnerUpLiveApiAddress = null;
+  private final ActivityResultLauncher<Intent> uploadActivityLauncher =
+      registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {});
 
   /** Called when the activity is first created. */
   @Override
   public void onCreate(Bundle savedInstanceState) {
+    EdgeToEdge.enable(this);
+    Window window = getWindow();
+    WindowCompat.getInsetsController(window, window.getDecorView())
+        .setAppearanceLightStatusBars(false);
     super.onCreate(savedInstanceState);
     setContentView(R.layout.account);
 
-    WidgetUtil.addLegacyOverflowButton(getWindow());
+    WidgetUtil.addLegacyOverflowButton(window);
 
     Intent intent = getIntent();
     mSynchronizerName = intent.getStringExtra("synchronizer");
@@ -160,8 +170,7 @@ public class AccountActivity extends AppCompatActivity implements Constants {
             tv.setTag(synchronizer.getPublicUrl());
             // FileSynchronizer: SDK 24 requires the file URI to be handled as FileProvider
             // Something like OI File Manager is needed too
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N
-                || !synchronizer.getName().equals(FileSynchronizer.NAME)) {
+            if (!synchronizer.getName().equals(FileSynchronizer.NAME)) {
               tv.setOnClickListener(urlButtonClick);
             }
           } else {
@@ -291,7 +300,7 @@ public class AccountActivity extends AppCompatActivity implements Constants {
         final Intent intent = new Intent(AccountActivity.this, UploadActivity.class);
         intent.putExtra("synchronizer", mSynchronizerName);
         intent.putExtra("mode", SyncManager.SyncMode.UPLOAD.name());
-        AccountActivity.this.startActivityForResult(intent, 113);
+        uploadActivityLauncher.launch(intent);
       };
 
   private final OnClickListener downloadButtonClick =
@@ -299,7 +308,7 @@ public class AccountActivity extends AppCompatActivity implements Constants {
         final Intent intent = new Intent(AccountActivity.this, UploadActivity.class);
         intent.putExtra("synchronizer", mSynchronizerName);
         intent.putExtra("mode", SyncManager.SyncMode.DOWNLOAD.name());
-        AccountActivity.this.startActivityForResult(intent, 113);
+        uploadActivityLauncher.launch(intent);
       };
 
   private final OnClickListener urlButtonClick =
@@ -311,7 +320,7 @@ public class AccountActivity extends AppCompatActivity implements Constants {
           try {
             startActivity(intent);
           } catch (Exception e) {
-            Log.i(getClass().getName(), "No handler for file intent installed? " + e.getMessage());
+            Log.e(getClass().getName(), "No handler for file intent installed", e);
           }
         }
       };

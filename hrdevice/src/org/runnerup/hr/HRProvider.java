@@ -17,7 +17,9 @@
 
 package org.runnerup.hr;
 
+import android.content.Intent;
 import android.os.Handler;
+import androidx.activity.result.ActivityResultLauncher;
 import androidx.appcompat.app.AppCompatActivity;
 
 /**
@@ -34,24 +36,6 @@ public interface HRProvider {
   int BATTERY_LEVEL_UNAVAILABLE = -1;
 
   /**
-   * An interface through which the client of the {@link HRProvider} is notified of changes to the
-   * state of the {@link HRProvider}
-   */
-  interface HRClient {
-    void onOpenResult(boolean ok);
-
-    void onScanResult(HRDeviceRef device);
-
-    void onConnectResult(boolean connectOK);
-
-    void onDisconnectResult(boolean disconnectOK);
-
-    void onCloseResult(boolean closeOK);
-
-    void log(HRProvider src, String msg);
-  }
-
-  /**
    * @return A human readable name for the {@link HRProvider}
    */
   String getName();
@@ -60,6 +44,11 @@ public interface HRProvider {
    * @return An internal name for a specific {@link HRProvider} instantiation
    */
   String getProviderName(); // For internal usage
+
+  /** String used for debug logging */
+  default String getLogName() {
+    return getProviderName();
+  }
 
   /**
    * @return true if the wireless module is enabled, false otherwise
@@ -71,10 +60,10 @@ public interface HRProvider {
    * 'activity' will have called
    *
    * @param activity The {@link AppCompatActivity} currently being displayed to the user
-   * @param requestCode An arbitrary code that will be given to
+   * @param launcher The activity result launcher
    * @return true if the intent was sent
    */
-  boolean startEnableIntent(AppCompatActivity activity, int requestCode);
+  boolean startEnableIntent(AppCompatActivity activity, ActivityResultLauncher<Intent> launcher);
 
   /**
    * Initialises the wireless module, allowing device scanning/connection
@@ -85,7 +74,7 @@ public interface HRProvider {
   void open(Handler handler, HRClient hrClient);
 
   /** Closes the wireless module */
-  void close();
+  void close(String from);
 
   /**
    * A pairing device is a wireless module that requires devices to be paired (or bonded) before
@@ -166,4 +155,22 @@ public interface HRProvider {
    *     battery information.
    */
   int getBatteryLevel();
+
+  /**
+   * An interface through which the client of the {@link HRProvider} is notified of changes to the
+   * state of the {@link HRProvider}
+   */
+  interface HRClient {
+    void onOpenResult(boolean ok);
+
+    void onScanResult(HRDeviceRef device);
+
+    void onConnectResult(boolean connectOK);
+
+    void onDisconnectResult(boolean disconnectOK);
+
+    void onCloseResult(boolean closeOK);
+
+    void log(HRProvider src, String msg);
+  }
 }

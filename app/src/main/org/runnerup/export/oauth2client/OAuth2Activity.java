@@ -18,30 +18,36 @@
 package org.runnerup.export.oauth2client;
 
 import android.annotation.SuppressLint;
-import android.app.ProgressDialog;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.webkit.CookieManager;
-import android.webkit.CookieSyncManager;
+import android.webkit.WebResourceError;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.WindowCompat;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.runnerup.common.util.Constants.DB;
 import org.runnerup.export.Synchronizer;
 import org.runnerup.export.util.FormValues;
 import org.runnerup.export.util.SyncHelper;
+import org.runnerup.util.ProgressDialogCompat;
 import org.runnerup.util.ViewUtil;
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -61,22 +67,20 @@ public class OAuth2Activity extends AppCompatActivity {
     String AUTH_EXTRA = "auth_extra";
     String TOKEN_URL = "token_url";
     String REDIRECT_URI = "redirect_uri";
-    String REVOKE_URL = "revoke_url";
-
-    String AUTH_TOKEN = "auth_token";
   }
 
   private boolean mFinished = false;
   private String mRedirectUri = null;
-  private ProgressDialog mSpinner = null;
+  private ProgressDialogCompat mSpinner = null;
   private Bundle mArgs = null;
-
-  private void setSavedPassword(WebView wv, boolean val) {
-    wv.getSettings().setSavePassword(false);
-  }
+  private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
   @Override
   public void onCreate(Bundle savedInstanceState) {
+    EdgeToEdge.enable(this);
+    Window window = getWindow();
+    WindowCompat.getInsetsController(window, window.getDecorView())
+        .setAppearanceLightStatusBars(false);
     super.onCreate(savedInstanceState);
     Intent intent = getIntent();
     Bundle b = mArgs = intent.getBundleExtra(OAuth2ServerCredentials.AUTH_ARGUMENTS);
@@ -87,8 +91,7 @@ public class OAuth2Activity extends AppCompatActivity {
     if (b.containsKey(OAuth2ServerCredentials.AUTH_EXTRA))
       auth_extra = b.getString(OAuth2ServerCredentials.AUTH_EXTRA);
 
-    mSpinner = new ProgressDialog(this);
-    mSpinner.requestWindowFeature(Window.FEATURE_NO_TITLE);
+    mSpinner = new ProgressDialogCompat(this);
     mSpinner.setMessage(getString(org.runnerup.common.R.string.Loading));
 
     // https://stackoverflow.com/questions/41025200/android-view-inflateexception-error-inflating-class-android-webkit-webview/58131421#58131421
@@ -108,7 +111,6 @@ public class OAuth2Activity extends AppCompatActivity {
         .setUserAgentString(
             "Mozilla/5.0 (Linux; Android 10; Android SDK built for x86) AppleWebKit/537.36 (KHTML,"
                 + " like Gecko) Chrome/74.0.3729.185 Mobile Safari/537.36");
-    setSavedPassword(wv, false);
 
     StringBuilder tmp = new StringBuilder();
     tmp.append(auth_url);
@@ -120,25 +122,37 @@ public class OAuth2Activity extends AppCompatActivity {
     }
     final String url = tmp.toString();
 
-    CookieSyncManager.createInstance(this);
-    CookieManager.getInstance().removeAllCookie();
-    wv.loadUrl(url);
-
     wv.setWebViewClient(
         new WebViewClient() {
+          // Used before Android N
+          @SuppressWarnings("deprecation")
           @Override
-          public boolean shouldOverrideUrlLoading(WebView view, String loadurl) {
-            if (loadurl.startsWith("https://runkeeper.com/jsp/widgets/streetTeamWidgetClose.jsp")
-                || loadurl.startsWith("https://runkeeper.com/jsp/widgets/friendWidgetClose.jsp")) {
-              wv.loadUrl("https://runkeeper.com/facebookSignIn");
+          public boolean shouldOverrideUrlLoading(WebView view, String loadUrl) {
+            if (handleRunkeeperRedirect(view, loadUrl)) {
               return true;
             }
-            if (loadurl.startsWith("https://runkeeper.com/home")) {
-              wv.loadUrl(url);
-              return true;
-            }
+            return super.shouldOverrideUrlLoading(view, loadUrl);
+          }
 
-            return super.shouldOverrideUrlLoading(view, loadurl);
+          @Override
+          public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+            if (handleRunkeeperRedirect(view, request.getUrl().toString())) {
+              return true;
+            }
+            return super.shouldOverrideUrlLoading(view, request);
+          }
+
+          private boolean handleRunkeeperRedirect(WebView view, String loadUrl) {
+            if (loadUrl.startsWith("https://runkeeper.com/jsp/widgets/streetTeamWidgetClose.jsp")
+                || loadUrl.startsWith("https://runkeeper.com/jsp/widgets/friendWidgetClose.jsp")) {
+              view.loadUrl("https://runkeeper.com/facebookSignIn");
+              return true;
+            }
+            if (loadUrl.startsWith("https://runkeeper.com/home")) {
+              view.loadUrl(url);
+              return true;
+            }
+            return false;
           }
 
           @Override
@@ -147,8 +161,6 @@ public class OAuth2Activity extends AppCompatActivity {
             if (!isFinishing()) mSpinner.show();
           }
 
-          // TODO: Fix "WrongThread"
-          @SuppressLint({"StaticFieldLeak", "WrongThread"})
           @Override
           public void onPageFinished(WebView view, String url) {
             super.onPageFinished(view, url);
@@ -157,7 +169,7 @@ public class OAuth2Activity extends AppCompatActivity {
               // this stupid crash!
               if (mSpinner != null && mSpinner.isShowing()) mSpinner.dismiss();
             } catch (Exception ex) {
-
+              // Ignore exception on dismiss
             }
 
             if (url.startsWith(mRedirectUri)) {
@@ -172,7 +184,7 @@ public class OAuth2Activity extends AppCompatActivity {
               }
 
               if (e != null) {
-                Log.e(getClass().getName(), "e: " + e);
+                Log.d(getClass().getName(), "e: " + e);
                 Intent res = new Intent().putExtra("error", e);
                 OAuth2Activity.this.setResult(AppCompatActivity.RESULT_CANCELED, res);
                 OAuth2Activity.this.finish();
@@ -186,92 +198,104 @@ public class OAuth2Activity extends AppCompatActivity {
                 mFinished = true;
               }
 
-              Bundle b = mArgs;
-              String code = u.getQueryParameter("code");
-              final String token_url = b.getString(OAuth2ServerCredentials.TOKEN_URL);
-              final FormValues fv = new FormValues();
-              fv.put("client_id", b.getString(OAuth2ServerCredentials.CLIENT_ID));
-              fv.put("client_secret", b.getString(OAuth2ServerCredentials.CLIENT_SECRET));
-              fv.put("grant_type", "authorization_code");
-              fv.put("redirect_uri", b.getString(OAuth2ServerCredentials.REDIRECT_URI));
-              fv.put("code", code);
-
-              final Intent res = new Intent().putExtra("url", token_url);
-
-              new AsyncTask<String, String, Integer>() {
-                @Override
-                protected Integer doInBackground(String... params) {
-                  int resultCode = AppCompatActivity.RESULT_CANCELED;
-                  HttpURLConnection conn = null;
-
-                  try {
-                    URL newUrl = new URL(token_url);
-                    conn = (HttpURLConnection) newUrl.openConnection();
-                    conn.setDoOutput(true);
-                    conn.setRequestMethod(Synchronizer.RequestMethod.POST.name());
-                    conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-                    SyncHelper.postData(conn, fv);
-                    StringBuilder obj = new StringBuilder();
-                    int responseCode = conn.getResponseCode();
-                    String amsg = conn.getResponseMessage();
-
-                    try {
-                      BufferedReader in =
-                          new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                      char[] buf = new char[1024];
-                      int len;
-                      while ((len = in.read(buf)) != -1) {
-                        obj.append(buf, 0, len);
-                      }
-
-                      res.putExtra(DB.ACCOUNT.AUTH_CONFIG, obj.toString());
-                      if (responseCode >= HttpURLConnection.HTTP_OK
-                          && responseCode < HttpURLConnection.HTTP_MULT_CHOICE) {
-                        resultCode = AppCompatActivity.RESULT_OK;
-                      }
-                    } catch (IOException e) {
-                      InputStream inS = conn.getErrorStream();
-                      String msg = inS == null ? "" : SyncHelper.readInputStream(inS);
-                      Log.w("oath2", "Error stream: " + responseCode + " " + amsg + "; " + msg);
-                    }
-                  } catch (Exception ex) {
-                    ex.printStackTrace(System.err);
-                    res.putExtra("ex", ex.toString());
-                  } finally {
-                    if (conn != null) {
-                      conn.disconnect();
-                    }
-                  }
-
-                  return resultCode;
-                }
-
-                @Override
-                protected void onPostExecute(Integer resultCode) {
-                  setResult(resultCode, res);
-                  finish();
-                }
-              }.execute();
+              exchangeCodeForToken(u);
             }
           }
 
           public void onReceivedError(
-              WebView view, int errorCode, String description, String failingUrl) {
+              WebView view, WebResourceRequest request, WebResourceError error) {
+            if (!request.isForMainFrame()) {
+              return;
+            }
+            String failingUrl = request.getUrl().toString();
             if (failingUrl.startsWith(mRedirectUri)) {
               view.setVisibility(View.INVISIBLE);
               return; // we know this is will give error...
             }
-            super.onReceivedError(view, errorCode, description, failingUrl);
+            super.onReceivedError(view, request, error);
             finish();
           }
         });
 
     setContentView(wv);
     ViewUtil.Insets(wv, true);
+    CookieManager.getInstance().removeAllCookies(ignored -> wv.loadUrl(url));
+  }
+
+  private void exchangeCodeForToken(Uri uri) {
+    Bundle b = mArgs;
+    String code = uri.getQueryParameter("code");
+    final String token_url = b.getString(OAuth2ServerCredentials.TOKEN_URL);
+    final FormValues fv = new FormValues();
+    fv.put("client_id", b.getString(OAuth2ServerCredentials.CLIENT_ID));
+    fv.put("client_secret", b.getString(OAuth2ServerCredentials.CLIENT_SECRET));
+    fv.put("grant_type", "authorization_code");
+    fv.put("redirect_uri", b.getString(OAuth2ServerCredentials.REDIRECT_URI));
+    fv.put("code", code);
+
+    final Intent res = new Intent().putExtra("url", token_url);
+    final Handler handler = new Handler(Looper.getMainLooper());
+
+    executor.execute(
+        () -> {
+          int resultCode = AppCompatActivity.RESULT_CANCELED;
+          HttpURLConnection conn = null;
+
+          try {
+            URL newUrl = new URL(token_url);
+            conn = (HttpURLConnection) newUrl.openConnection();
+            conn.setDoOutput(true);
+            conn.setRequestMethod(Synchronizer.RequestMethod.POST.name());
+            conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+            SyncHelper.postData(conn, fv);
+            StringBuilder obj = new StringBuilder();
+            int responseCode = conn.getResponseCode();
+            String amsg = conn.getResponseMessage();
+
+            try {
+              BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+              char[] buf = new char[1024];
+              int len;
+              while ((len = in.read(buf)) != -1) {
+                obj.append(buf, 0, len);
+              }
+
+              res.putExtra(DB.ACCOUNT.AUTH_CONFIG, obj.toString());
+              if (responseCode >= HttpURLConnection.HTTP_OK
+                  && responseCode < HttpURLConnection.HTTP_MULT_CHOICE) {
+                resultCode = AppCompatActivity.RESULT_OK;
+              }
+            } catch (IOException e) {
+              InputStream inS = conn.getErrorStream();
+              String msg = inS == null ? "" : SyncHelper.readInputStream(inS);
+              Log.w("oath2", "Error stream: " + responseCode + " " + amsg + "; " + msg);
+            }
+          } catch (Exception ex) {
+            ex.printStackTrace(System.err);
+            res.putExtra("ex", ex.toString());
+          } finally {
+            if (conn != null) {
+              conn.disconnect();
+            }
+          }
+
+          final int finalResultCode = resultCode;
+          handler.post(
+              () -> {
+                setResult(finalResultCode, res);
+                finish();
+              });
+        });
   }
 
   @Override
   public void onDestroy() {
+    if (executor != null) {
+      executor.shutdown();
+    }
+    if (mSpinner != null && mSpinner.isShowing()) {
+      mSpinner.dismiss();
+    }
     super.onDestroy();
   }
 

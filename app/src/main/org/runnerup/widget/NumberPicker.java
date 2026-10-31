@@ -21,6 +21,7 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.os.Handler;
+import android.os.Looper;
 import android.text.InputType;
 import android.util.AttributeSet;
 import android.view.Gravity;
@@ -59,13 +60,13 @@ public class NumberPicker extends LinearLayout {
 
   private boolean longInc = false;
   private boolean longDec = false;
-  private final Handler longHandler = new Handler();
+  private final Handler longHandler = new Handler(Looper.getMainLooper());
   private final int textSize = 25;
   private int digits = DIGITS;
   private String fmtString = "%0" + digits + "d";
 
   public NumberPicker(Context context, AttributeSet attrs) {
-    super(context, attrs);
+    super(context);
 
     createValueText(context);
     createButton(context, '+');
@@ -228,7 +229,7 @@ public class NumberPicker extends LinearLayout {
 
   private void validateInput(EditText tv) {
     String str = String.valueOf(tv.getText());
-    if ("".equals(str)) {
+    if (str.isEmpty()) {
       updateView();
     } else {
       try {

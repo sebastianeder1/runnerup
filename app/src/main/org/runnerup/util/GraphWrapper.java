@@ -17,25 +17,38 @@
 
 package org.runnerup.util;
 
-import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.database.sqlite.SQLiteDatabase;
-import android.os.AsyncTask;
+import android.graphics.Color;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.View;
+import android.widget.CheckBox;
+import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.LinearLayout.LayoutParams;
 import android.widget.Toast;
+import androidx.annotation.NonNull;
+import androidx.core.graphics.ColorUtils;
 import androidx.preference.PreferenceManager;
-import com.jjoe64.graphview.DefaultLabelFormatter;
-import com.jjoe64.graphview.GraphView;
-import com.jjoe64.graphview.series.DataPoint;
-import com.jjoe64.graphview.series.LineGraphSeries;
+import com.github.mikephil.charting.charts.LineChart;
+import com.github.mikephil.charting.components.AxisBase;
+import com.github.mikephil.charting.components.YAxis;
+import com.github.mikephil.charting.data.Entry;
+import com.github.mikephil.charting.data.LineData;
+import com.github.mikephil.charting.data.LineDataSet;
+import com.github.mikephil.charting.formatter.IAxisValueFormatter;
+import com.github.mikephil.charting.highlight.Highlight;
+import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
+import com.github.mikephil.charting.listener.OnChartValueSelectedListener;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.runnerup.R;
 import org.runnerup.common.util.Constants;
 import org.runnerup.db.entities.LocationEntity;
@@ -43,28 +56,22 @@ import org.runnerup.view.HRZonesBar;
 import org.runnerup.workout.SpeedUnit;
 
 public class GraphWrapper implements Constants {
-  private final GraphView graphView;
-  private final GraphView graphView2;
-
+  private final LineChart chart;
   private final LinearLayout graphTab;
   private final HRZonesBar hrzonesBar;
   private final Formatter formatter;
   private final LinearLayout hrzonesBarLayout;
   private final LoadParam loadParam;
 
-  interface XAxis {
-    String label();
-    String formatValue(double val);
-    double getX(double distance, double time_ms);
-  };
-
+  private final ExecutorService executor = Executors.newSingleThreadExecutor();
+  private final Handler handler = new Handler(Looper.getMainLooper());
   private final XAxis distanceXAxis;
   private final XAxis timeXAxis;
+  boolean firstLoad = true;
   boolean useDistanceAsX = true;
   private XAxis xAxis;
 
   /** Called when the activity is first created. */
-  @SuppressLint("ObsoleteSdkInt")
   public GraphWrapper(
       Context context,
       LinearLayout graphTab,
@@ -77,37 +84,69 @@ public class GraphWrapper implements Constants {
     this.hrzonesBarLayout = hrzonesBarLayout;
     this.formatter = formatter;
 
-    this.distanceXAxis = new XAxis() {
-        @Override
-        public String label() {
-          return context.getString(org.runnerup.common.R.string.Distance);
-        }
-        @Override
-        public String formatValue(double value) {
-          return formatter.formatDistance(Formatter.Format.TXT_SHORT,
-                                          (long)value);
-        }
-        @Override
-        public double getX(double distance, double time_ms) {
-          return distance;
-        }
-      };
+    this.distanceXAxis =
+        new XAxis() {
+          @Override
+          public String label() {
+            return context.getString(org.runnerup.common.R.string.Distance);
+          }
 
-    this.timeXAxis = new XAxis() {
-        @Override
-        public String label() {
-          return context.getString(org.runnerup.common.R.string.Time);
-        }
-        @Override
-        public String formatValue(double value) {
-          return formatter.formatElapsedTime(Formatter.Format.TXT_SHORT,
-                                             (long)value);
-        }
-        @Override
-        public double getX(double distance, double time_ms) {
-          return time_ms / 1000;
-        }
-      };
+          public String labelLong() {
+            return label() + " " + formatter.getDistanceUnit();
+          }
+
+          @Override
+          public String formatLongValue(double value) {
+            return formatter.getDistanceDisplay(value) + " " + formatter.getDistanceUnit();
+          }
+
+          @Override
+          public String formatValue(double value) {
+            return formatter.getDistanceDisplay(value);
+          }
+
+          @Override
+          public double getX(double distance, double time_ms) {
+            return distance;
+          }
+
+          @Override
+          public String unit() {
+            return formatter.getDistanceUnit();
+          }
+        };
+
+    this.timeXAxis =
+        new XAxis() {
+          @Override
+          public String label() {
+            return context.getString(org.runnerup.common.R.string.Time);
+          }
+
+          public String labelLong() {
+            return label();
+          }
+
+          @Override
+          public String formatLongValue(double value) {
+            return formatValue(value);
+          }
+
+          @Override
+          public String formatValue(double value) {
+            return formatter.formatElapsedTime(Formatter.Format.TXT_SHORT, (long) value);
+          }
+
+          @Override
+          public double getX(double distance, double time_ms) {
+            return time_ms / 1000;
+          }
+
+          @Override
+          public String unit() {
+            return "";
+          }
+        };
 
     this.useDistanceAsX = use_distance_as_x;
     if (use_distance_as_x) {
@@ -116,55 +155,11 @@ public class GraphWrapper implements Constants {
       this.xAxis = timeXAxis;
     }
 
-    loadParam = new LoadParam(context, mDB, mID);
+    this.loadParam = new LoadParam(context, mDB, mID);
 
-    graphView = new GraphView(context);
-    graphView.setTitle(formatter.formatVelocityLabel());
-    graphView
-        .getGridLabelRenderer()
-        .setLabelFormatter(
-            new DefaultLabelFormatter() {
-              @Override
-              public String formatLabel(double value, boolean isValueX) {
-                if (isValueX) {
-                  return xAxis.formatValue(value);
-                } else {
-                  return formatter.formatVelocityByPreferredUnit(Formatter.Format.TXT_SHORT, value);
-                }
-              }
-            });
-    graphView.getGridLabelRenderer().setVerticalAxisTitle(formatter.getVelocityUnit(context));
-    graphView
-        .getGridLabelRenderer()
-        .setHorizontalAxisTitle(xAxis.label());
-    // enable zoom
-    graphView.getViewport().setScalable(true);
-    graphView.getViewport().setScrollable(true);
-
-    graphView2 = new GraphView(context);
-    graphView2.setTitle(context.getString(org.runnerup.common.R.string.Heart_rate));
-    graphView2.getGridLabelRenderer().setVerticalAxisTitle("bpm");
-    graphView2
-        .getGridLabelRenderer()
-        .setHorizontalAxisTitle(xAxis.label());
-    graphView2
-        .getGridLabelRenderer()
-        .setLabelFormatter(
-            new DefaultLabelFormatter() {
-              @Override
-              public String formatLabel(double value, boolean isValueX) {
-                if (isValueX) {
-                  return xAxis.formatValue(value);
-                } else {
-                  return formatter.formatHeartRate(Formatter.Format.TXT_SHORT, value);
-                }
-              }
-            });
-    graphView2.getViewport().setScalable(true);
-    graphView2.getViewport().setScrollable(true);
-
+    chart = new LineChart(context);
     hrzonesBar = new HRZonesBar(context);
-    new LoadGraph().execute(loadParam);
+    loadGraph();
   }
 
   public void setUseDistanceAsX(boolean val) {
@@ -177,38 +172,152 @@ public class GraphWrapper implements Constants {
     } else {
       xAxis = timeXAxis;
     }
-    graphView.removeAllSeries();
-    graphView2.removeAllSeries();
-    new LoadGraph().execute(loadParam);
+    chart.clear();
+    loadGraph();
   }
+
+  private void loadGraph() {
+    executor.execute(
+        () -> {
+          // Background work
+          GraphProducer producer = doLoadGraphInBackground(loadParam);
+          // Post result to UI thread
+          handler.post(() -> onPostExecute(producer));
+        });
+  }
+
+  private GraphProducer doLoadGraphInBackground(LoadParam params) {
+    LocationEntity.LocationList<LocationEntity> ll =
+        new LocationEntity.LocationList<>(params.mDB, params.mID);
+    GraphProducer graphData = new GraphProducer(params.context, ll.getCount());
+    double lastDistance = 0;
+    long lastTime = 0;
+    int lastLap = -1;
+    Double tot_distance = 0.0;
+    double tot_time = 0.0;
+    for (LocationEntity loc : ll) {
+      Long time = loc.getElapsed();
+      time = time != null ? time : lastTime;
+      tot_time = time.doubleValue();
+      Integer lap = loc.getLap();
+      lap = lap != null ? lap : 0;
+      tot_distance = tot_distance != null ? loc.getDistance() : lastDistance;
+
+      double tot_X = xAxis.getX(tot_distance, time);
+      if (lap != lastLap) {
+        graphData.clearSmooth(tot_X);
+        lastLap = lap;
+      }
+
+      graphData.addObservation(time - lastTime, tot_distance - lastDistance, tot_X, loc);
+      lastTime = time;
+      lastDistance = tot_distance;
+    }
+    graphData.clearSmooth(xAxis.getX(tot_distance, tot_time));
+
+    ll.close();
+    return graphData;
+  }
+
+  private void onPostExecute(GraphProducer graphData) {
+    if (graphData == null) return;
+
+    graphData.complete(chart);
+    chart.invalidate();
+    chart.setVisibility(View.VISIBLE);
+    graphTab.removeView(chart);
+
+    LayoutParams layout = new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f);
+
+    graphTab.addView(chart, layout);
+    hrzonesBarLayout.removeView(hrzonesBar);
+    if (graphData.HasHRZHist()) {
+      hrzonesBarLayout.setVisibility(View.VISIBLE);
+      hrzonesBarLayout.addView(hrzonesBar);
+    } else {
+      hrzonesBarLayout.setVisibility(View.GONE);
+    }
+
+    // Add legend container to top of the view
+    LinearLayout legend = new LinearLayout(graphTab.getContext());
+    legend.setOrientation(LinearLayout.HORIZONTAL);
+    HorizontalScrollView scroll = new HorizontalScrollView(graphTab.getContext());
+    scroll.addView(legend);
+    LayoutParams scrollParams =
+        new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+    scroll.setLayoutParams(scrollParams);
+    graphTab.addView(scroll, 0);
+    for (CheckBox cb : graphData.legendBoxes) {
+      legend.addView(cb);
+    }
+
+    if (!firstLoad) {
+      graphTab.invalidate();
+    } else {
+      firstLoad = false;
+    }
+  }
+
+  private double calculateAverageHr(int[] data) {
+    int sum = 0;
+    int no = 0;
+
+    for (int aData : data) {
+      if (aData > 0) {
+        sum = sum + aData;
+        no++;
+      }
+    }
+    // TODO Average of pointe, not over time
+    if (no == 0) {
+      return 0;
+    } else {
+      return (double) sum / no;
+    }
+  }
+
+  interface XAxis {
+    String label();
+
+    String labelLong();
+
+    String formatLongValue(double val);
+
+    String formatValue(double val);
+
+    double getX(double distance, double time_ms);
+
+    String unit();
+  }
+
+  record LoadParam(Context context, SQLiteDatabase mDB, long mID) {}
 
   class GraphProducer {
     final int interval;
-    boolean first = true;
-    int pos = 0;
     final double[] time;
     final double[] distance;
+    final double[] elevation;
+    final int[] hr;
+    final List<DataPoint> velocityList;
+    final List<DataPoint> hrList;
+    final List<DataPoint> elevationList;
+    final HRZones hrCalc;
+    final SpeedUnit preferred_speedunit;
+    final List<CheckBox> legendBoxes = new ArrayList<>();
+    boolean first = true;
+    int pos = 0;
     double sum_time = 0;
     double sum_distance = 0;
     double acc_time = 0;
-
-    final int[] hr;
-    double[] hrzHist = null;
-
+    double[] hrzHist = null; // no chart displayed
     double tot_avg_hr = 0;
-
     double avg_velocity = 0;
     double min_velocity = Double.MAX_VALUE;
     double max_velocity = Double.MIN_VALUE;
-    final List<DataPoint> velocityList;
-    final List<DataPoint> hrList;
-
     boolean showPace = false;
+    boolean showElevation = false;
     boolean showHR = false;
     boolean showHRZhist = false;
-    final HRZones hrCalc;
-
-    final SpeedUnit preferred_speedunit;
 
     public GraphProducer(Context context, int noPoints) {
       final int GRAPH_INTERVAL_SECONDS = 5; // 1 point every 5 sec
@@ -230,6 +339,9 @@ public class GraphWrapper implements Constants {
       this.hrList = new ArrayList<>();
       this.hr = new int[graphAverageSeconds];
 
+      this.elevationList = new ArrayList<>();
+      this.elevation = new double[graphAverageSeconds];
+
       Resources res = context.getResources();
       Context ctx = context.getApplicationContext();
       SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(ctx);
@@ -239,7 +351,7 @@ public class GraphWrapper implements Constants {
         Arrays.fill(this.hrzHist, 0);
         showHRZhist = true;
       }
-      this.preferred_speedunit = Formatter.getPreferredSpeedUnit(context);
+      this.preferred_speedunit = formatter.getPreferredVelocityUnit();
 
       clearSmooth(0);
     }
@@ -255,6 +367,7 @@ public class GraphWrapper implements Constants {
         time[i] = 0;
         distance[i] = 0;
         hr[i] = 0;
+        elevation[i] = 0;
       }
       pos = 0;
       sum_time = 0;
@@ -288,15 +401,20 @@ public class GraphWrapper implements Constants {
         this.hr[p] = 0;
       }
 
+      Double altitude = loc.getAltitude();
+      this.elevation[p] = altitude != null ? altitude : 0.0;
+
       if (delta_distance > 0 && delta_time > 0) {
         showPace = true;
+        if (altitude != null) showElevation = true;
       }
 
       pos += 1;
       acc_time += delta_time;
 
-      if (pos >= this.time.length && (acc_time >= 1000 * interval) &&
-          xAxis.getX(sum_distance, sum_time) > 0) {
+      if (pos >= this.time.length
+          && (acc_time >= 1000 * interval)
+          && xAxis.getX(sum_distance, sum_time) > 0) {
         emit(tot_X);
       }
     }
@@ -312,9 +430,13 @@ public class GraphWrapper implements Constants {
         // Avoid presenting very slow pace (easier than to handle manual y axis scaling)
         velocity = Math.max(velocity, paceLimit);
       }
+
+      double elevation = this.elevation[pos % this.time.length];
+
       if (first) {
         if (tot_X > 0) {
           velocityList.add(new DataPoint(0, velocity));
+          elevationList.add(new DataPoint(0, elevation));
           if (avg_hr > 0) {
             hrList.add(new DataPoint(0, Math.round(avg_hr)));
           }
@@ -322,6 +444,7 @@ public class GraphWrapper implements Constants {
         first = false;
       }
       velocityList.add(new DataPoint(tot_X, velocity));
+      elevationList.add(new DataPoint(tot_X, elevation));
       if (avg_hr > 0) {
         hrList.add(new DataPoint(tot_X, Math.round(avg_hr)));
       }
@@ -335,6 +458,384 @@ public class GraphWrapper implements Constants {
       if (sum_distance > 0 && sum_time > 0) {
         showPace = true;
       }
+    }
+
+    private void setAxisAndLegend(
+        LineDataSet dataSet, int color, IAxisValueFormatter valueFormatter) {
+      dataSet.setColor(color);
+      dataSet.setLineWidth(1.5f);
+      dataSet.setDrawValuesEnabled(false);
+      dataSet.setDrawCirclesEnabled(false);
+
+      YAxis axis = null;
+      if (!chart.getAxisLeft().isEnabled()) {
+        axis = chart.getAxisLeft();
+        dataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
+      } else {
+        dataSet.setAxisDependency(YAxis.AxisDependency.RIGHT);
+        if (!chart.getAxisRight().isEnabled()) {
+          axis = chart.getAxisRight();
+        }
+      }
+      if (axis != null) {
+        axis.setEnabled(true);
+        axis.setTextColor(color);
+        axis.setAxisLineColor(color);
+        axis.setTextSize(14f);
+        axis.setValueFormatter(valueFormatter);
+      }
+
+      CheckBox cB = new CheckBox(graphTab.getContext());
+      cB.setText(dataSet.getLabel());
+      cB.setTextColor(color);
+      cB.setTextSize(12f);
+      cB.setChecked(true);
+      cB.setOnCheckedChangeListener(
+          (btn, checked) -> {
+            if (chart.getData() != null) {
+              ILineDataSet<?> ds = chart.getData().getDataSetByLabel(dataSet.getLabel(), false);
+              if (ds != null) {
+                ds.setVisible(checked);
+                chart.invalidate();
+              }
+            }
+          });
+      legendBoxes.add(cB);
+    }
+
+    public void complete(LineChart chart) {
+      if (velocityList.isEmpty()) {
+        avg_velocity = 0;
+      } else {
+        avg_velocity /= velocityList.size();
+      }
+      Log.d(getClass().getName(), "graph: " + velocityList.size() + " points");
+
+      boolean smoothData =
+          PreferenceManager.getDefaultSharedPreferences(graphTab.getContext())
+              .getBoolean(
+                  graphTab
+                      .getContext()
+                      .getResources()
+                      .getString(R.string.pref_pace_graph_smoothing),
+                  true);
+      if (!velocityList.isEmpty() && smoothData) {
+        GraphFilter f = new GraphFilter(velocityList);
+        final String defaultFilterList =
+            graphTab.getContext().getResources().getString(R.string.mm31kz513sg5);
+        final String filterList =
+            PreferenceManager.getDefaultSharedPreferences(graphTab.getContext())
+                .getString(
+                    graphTab
+                        .getContext()
+                        .getResources()
+                        .getString(R.string.pref_pace_graph_smoothing_filters),
+                    defaultFilterList);
+        final String[] filters = filterList.split(";");
+        StringBuilder s =
+            new StringBuilder("Applying filters(" + filters.length + ", >" + filterList + "<):");
+        for (String filter : filters) {
+          int[] args = getArgs(filter);
+          if (filter.startsWith("mm")) {
+            if (args.length == 1) {
+              f.movingMedian(args[0]);
+              s.append(" mm(").append(args[0]).append(")");
+            }
+          } else if (filter.startsWith("ma")) {
+            if (args.length == 1) {
+              f.movingAvergage(args[0]);
+              s.append(" ma(").append(args[0]).append(")");
+            }
+          } else if (filter.startsWith("kz")) {
+            if (args.length == 2) {
+              f.KolmogorovZurbenko(args[0], args[1]);
+              s.append(" kz(").append(args[0]).append(",").append(args[1]).append(")");
+            }
+          } else if (filter.startsWith("sg")) {
+            if (args.length == 1 && args[0] == 5) {
+              f.SavitzkyGolay5();
+              s.append(" sg(5)");
+            } else if (args.length == 1 && args[0] == 7) {
+              f.SavitzkyGolay7();
+              s.append(" sg(7)");
+            }
+          }
+        }
+        Log.d(getClass().getName(), s.toString());
+        f.complete();
+      }
+
+      if (showHRZhist && hrzHist != null) {
+        StringBuilder s = new StringBuilder("HR Zones:");
+        double sum = 0;
+        for (double aHrzHist : hrzHist) {
+          sum += aHrzHist;
+        }
+        if (sum > 0) {
+          for (int i = 0; i < hrzHist.length; i++) {
+            hrzHist[i] = hrzHist[i] / sum;
+            s.append(" ").append(hrzHist[i]);
+          }
+        }
+        Log.d(getClass().getName(), s.toString());
+        hrzonesBar.pushHrzData(hrzHist);
+        hrzonesBar.invalidate();
+      }
+
+      int chartBackColor = Color.BLACK;
+      if (chart.getBackground() instanceof android.graphics.drawable.ColorDrawable) {
+        chartBackColor =
+            ((android.graphics.drawable.ColorDrawable) chart.getBackground()).getColor();
+      }
+      int chartForeColor = Color.WHITE;
+      if (chart.getForeground() instanceof android.graphics.drawable.ColorDrawable) {
+        chartForeColor =
+            ((android.graphics.drawable.ColorDrawable) chart.getForeground()).getColor();
+      }
+      // Data mapping to MPAndroidChart
+
+      // dataSets and axisFormatters are added in pairs
+      List<ILineDataSet<Void>> dataSets = new ArrayList<>();
+      List<IAxisValueFormatter> axisFormatters = new ArrayList<>();
+      chart.getAxisLeft().setEnabled(false);
+      chart.getAxisRight().setEnabled(false);
+
+      if (showPace && !velocityList.isEmpty()) {
+        List<Entry<Void>> entries = new ArrayList<>();
+        for (DataPoint p : velocityList) {
+          entries.add(new Entry<>((float) p.getX(), (float) p.getY(), null, null));
+        }
+        LineDataSet<Void> velocityDataSet =
+            new LineDataSet<>(
+                entries,
+                formatter.formatVelocityLabel(preferred_speedunit)
+                    + " ("
+                    + formatter.getVelocityUnit()
+                    + ")");
+        axisFormatters.add(
+            0,
+            new IAxisValueFormatter() {
+              @NonNull
+              @Override
+              public String getFormattedValue(float value, AxisBase axis) {
+                return formatter.formatVelocity(
+                    Formatter.Format.TXT_SHORT, value, preferred_speedunit);
+              }
+            });
+        setAxisAndLegend(
+            velocityDataSet,
+            ColorUtils.blendARGB(Color.BLUE, chartForeColor, 0.5f),
+            axisFormatters.get(axisFormatters.size() - 1));
+        dataSets.add(velocityDataSet);
+      }
+
+      if (showHR && !hrList.isEmpty()) {
+        List<Entry<Void>> hrEntries = new ArrayList<>();
+        for (DataPoint p : hrList) {
+          hrEntries.add(new Entry<>((float) p.getX(), (float) p.getY(), null, null));
+        }
+        LineDataSet<Void> hrDataSet =
+            new LineDataSet<>(
+                hrEntries,
+                graphTab.getContext().getString(org.runnerup.common.R.string.Heart_rate)
+                    + " (bpm)");
+        axisFormatters.add(
+            new IAxisValueFormatter() {
+              @NonNull
+              @Override
+              public String getFormattedValue(float value, AxisBase axis) {
+                return formatter.formatHeartRate(Formatter.Format.TXT_SHORT, value);
+              }
+            });
+        dataSets.add(hrDataSet);
+        setAxisAndLegend(
+            hrDataSet,
+            ColorUtils.blendARGB(Color.RED, chartForeColor, 0.5f),
+            axisFormatters.get(axisFormatters.size() - 1));
+      }
+
+      if (showElevation && !elevationList.isEmpty()) {
+        List<DataPoint> plottedElevation = elevationList;
+        double[] inverseScaleParams = null;
+        if (dataSets.size() >= 2) {
+          // only one right axis supported, fake it by scaling the formatter series to previous
+          ILineDataSet<Void> targetSeries = dataSets.get(1);
+          double[] sourceMinMax = getMinMax(elevationList);
+          plottedElevation =
+              scaleToRange(
+                  elevationList,
+                  sourceMinMax[0],
+                  sourceMinMax[1],
+                  targetSeries.getYMin(),
+                  targetSeries.getYMax());
+          // Keep inverse mapping local so formatter can convert scaled values back.
+          inverseScaleParams =
+              new double[] {
+                targetSeries.getYMin(), targetSeries.getYMax(), sourceMinMax[0], sourceMinMax[1]
+              };
+        }
+        List<Entry<Void>> elevationEntries = new ArrayList<>();
+        for (DataPoint p : plottedElevation) {
+          elevationEntries.add(new Entry<>((float) p.getX(), (float) p.getY(), null, null));
+        }
+        LineDataSet<Void> elevationDataSet =
+            new LineDataSet<>(
+                elevationEntries,
+                graphTab.getContext().getString(org.runnerup.common.R.string.Elevation)
+                    + " ("
+                    + formatter.getElevationUnit()
+                    + ")");
+        elevationDataSet.setDrawFilledEnabled(true);
+        elevationDataSet.setFillDrawable(
+            new android.graphics.drawable.ColorDrawable(
+                ColorUtils.blendARGB(elevationDataSet.getColor(), chartBackColor, 0.5f)));
+        final double[] finalInverseScaleParams = inverseScaleParams;
+        axisFormatters.add(
+            new IAxisValueFormatter() {
+              @NonNull
+              @Override
+              public String getFormattedValue(float value, AxisBase axis) {
+                double displayValue = value;
+                if (finalInverseScaleParams != null) {
+                  displayValue =
+                      scaleValueToRange(
+                          value,
+                          finalInverseScaleParams[0],
+                          finalInverseScaleParams[1],
+                          finalInverseScaleParams[2],
+                          finalInverseScaleParams[3]);
+                }
+                return formatter.formatElevation(Formatter.Format.TXT_SHORT, displayValue);
+              }
+            });
+        setAxisAndLegend(
+            elevationDataSet,
+            ColorUtils.setAlphaComponent(Color.GREEN, 64),
+            axisFormatters.get(axisFormatters.size() - 1));
+        dataSets.add(elevationDataSet);
+      }
+
+      chart.getLegend().setEnabled(false);
+      chart.getDescription().setEnabled(false);
+      chart.getXAxis().setTextColor(chartForeColor);
+      chart.getXAxis().setTextSize(14f);
+      chart
+          .getXAxis()
+          .setPosition(com.github.mikephil.charting.components.XAxis.XAxisPosition.BOTTOM);
+      IAxisValueFormatter xAxisFormatter =
+          new IAxisValueFormatter() {
+            @NonNull
+            @Override
+            public String getFormattedValue(float value, AxisBase axis) {
+              return xAxis.formatValue(value);
+            }
+          };
+      chart.getXAxis().setValueFormatter(xAxisFormatter);
+
+      chart.setOnChartValueSelectedListener(
+          new OnChartValueSelectedListener() {
+            @Override
+            public void onValueSelected(@NonNull Entry e, @NonNull Highlight h) {
+              // Find out the dataset line that was tapped
+              int datasetIndex = h.getDataSetIndex();
+              int axisIndex = axisFormatters.size() - 1 - datasetIndex;
+              if (datasetIndex >= axisFormatters.size()
+                  || axisIndex >= axisFormatters.size()
+                  || axisIndex < 0) {
+                return;
+              }
+
+              // Display the results
+              assert chart.getData() != null;
+              String message =
+                  chart.getData().getDataSetByIndex(datasetIndex).getLabel()
+                      + ": "
+                      + axisFormatters.get(axisIndex).getFormattedValue(e.getY(), null)
+                      + "\n"
+                      + xAxis.formatLongValue(e.getX());
+
+              Toast.makeText(chart.getContext(), message, Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onNothingSelected() {}
+          });
+
+      // reverse the order so first chart is rendered on top
+      List<ILineDataSet<Void>> chartSets = new ArrayList<>();
+      for (int i = dataSets.size() - 1; i >= 0; i--) {
+        chartSets.add(dataSets.get(i));
+      }
+      chart.setData(new LineData(chartSets));
+    }
+
+    private double[] getMinMax(List<DataPoint> series) {
+      double min = Double.POSITIVE_INFINITY;
+      double max = Double.NEGATIVE_INFINITY;
+      for (DataPoint point : series) {
+        double y = point.getY();
+        if (y < min) {
+          min = y;
+        }
+        if (y > max) {
+          max = y;
+        }
+      }
+      if (!Double.isFinite(min) || !Double.isFinite(max)) {
+        return new double[] {0.0, 0.0};
+      }
+      return new double[] {min, max};
+    }
+
+    private List<DataPoint> scaleToRange(
+        List<DataPoint> source,
+        double sourceMin,
+        double sourceMax,
+        double targetMin,
+        double targetMax) {
+      List<DataPoint> scaled = new ArrayList<>(source.size());
+      if (sourceMax - sourceMin <= 0) {
+        double mapped = targetMin + ((targetMax - targetMin) / 2.0);
+        for (DataPoint point : source) {
+          scaled.add(new DataPoint(point.getX(), mapped));
+        }
+        return scaled;
+      }
+
+      for (DataPoint point : source) {
+        double mapped = scaleValueToRange(point.getY(), sourceMin, sourceMax, targetMin, targetMax);
+        scaled.add(new DataPoint(point.getX(), mapped));
+      }
+      return scaled;
+    }
+
+    private double scaleValueToRange(
+        double value, double sourceMin, double sourceMax, double targetMin, double targetMax) {
+      double sourceRange = sourceMax - sourceMin;
+      if (sourceRange <= 0) {
+        return targetMin + ((targetMax - targetMin) / 2.0);
+      }
+      return targetMin + ((value - sourceMin) * (targetMax - targetMin) / sourceRange);
+    }
+
+    private int[] getArgs(String s) {
+      try {
+        s = s.substring(s.indexOf('(') + 1);
+        s = s.substring(0, s.indexOf(')'));
+        String[] sargs = s.split(",");
+        int[] args = new int[sargs.length];
+        for (int i = 0; i < args.length; i++) {
+          args[i] = Integer.parseInt(sargs[i]);
+        }
+        return args;
+      } catch (Exception e) {
+        e.printStackTrace();
+        return new int[0];
+      }
+    }
+
+    public boolean HasHRZHist() {
+      return showHR && showHRZhist;
     }
 
     class GraphFilter {
@@ -450,252 +951,6 @@ public class GraphWrapper implements Constants {
 
       void KolmogorovZurbenko(int n, int len) {
         for (int i = 0; i < n; i++) movingAvergage(len);
-      }
-    }
-
-    public void complete(final GraphView graphView) {
-      avg_velocity /= velocityList.size();
-      Log.e(getClass().getName(), "graph: " + velocityList.size() + " points");
-
-      boolean smoothData =
-          PreferenceManager.getDefaultSharedPreferences(graphView.getContext())
-              .getBoolean(
-                  graphView
-                      .getContext()
-                      .getResources()
-                      .getString(R.string.pref_pace_graph_smoothing),
-                  true);
-      if (velocityList.size() > 0 && smoothData) {
-        GraphFilter f = new GraphFilter(velocityList);
-        final String defaultFilterList =
-            graphView.getContext().getResources().getString(R.string.mm31kz513sg5);
-        final String filterList =
-            PreferenceManager.getDefaultSharedPreferences(graphView.getContext())
-                .getString(
-                    graphView
-                        .getContext()
-                        .getResources()
-                        .getString(R.string.pref_pace_graph_smoothing_filters),
-                    defaultFilterList);
-        final String[] filters = filterList.split(";");
-        System.err.print("Applying filters(" + filters.length + ", >" + filterList + "<):");
-        for (String filter : filters) {
-          int[] args = getArgs(filter);
-          if (filter.startsWith("mm")) {
-            if (args.length == 1) {
-              f.movingMedian(args[0]);
-              System.err.print(" mm(" + args[0] + ")");
-            }
-          } else if (filter.startsWith("ma")) {
-            if (args.length == 1) {
-              f.movingAvergage(args[0]);
-              System.err.print(" ma(" + args[0] + ")");
-            }
-          } else if (filter.startsWith("kz")) {
-            if (args.length == 2) {
-              f.KolmogorovZurbenko(args[0], args[1]);
-              System.err.print(" kz(" + args[0] + "," + args[1] + ")");
-            }
-          } else if (filter.startsWith("sg")) {
-            if (args.length == 1 && args[0] == 5) {
-              f.SavitzkyGolay5();
-              System.err.print(" sg(5)");
-            } else if (args.length == 1 && args[0] == 7) {
-              f.SavitzkyGolay7();
-              System.err.print(" sg(7)");
-            }
-          }
-        }
-        Log.e(getClass().getName(), "");
-        f.complete();
-      }
-      LineGraphSeries<DataPoint> graphViewData =
-          new LineGraphSeries<>(velocityList.toArray(new DataPoint[0]));
-      graphView.addSeries(graphViewData); // data
-      graphView.getViewport().setMinX(graphView.getViewport().getMinX(true));
-      graphView.getViewport().setMaxX(graphView.getViewport().getMaxX(true));
-      graphViewData.setOnDataPointTapListener(
-          (series, dataPoint) -> {
-            String msg =
-                String.format(
-                    "%s: %s\n%s: %s %s",
-                    graphView.getContext().getString(org.runnerup.common.R.string.Distance),
-                    xAxis.formatValue(dataPoint.getX()),
-                    formatter.formatVelocityLabel(),
-                    formatter.formatVelocityByPreferredUnit(
-                        Formatter.Format.TXT_SHORT, dataPoint.getY()),
-                    formatter.getVelocityUnit(graphView.getContext()));
-            Toast.makeText(graphView.getContext(), msg, Toast.LENGTH_SHORT).show();
-          });
-      if (showHR) {
-        LineGraphSeries<DataPoint> graphViewData2 =
-            new LineGraphSeries<>(hrList.toArray(new DataPoint[0]));
-        graphView2.addSeries(graphViewData2); // data
-        graphView2.getViewport().setMinX(graphView2.getViewport().getMinX(true));
-        graphView2.getViewport().setMaxX(graphView2.getViewport().getMaxX(true));
-        graphViewData2.setOnDataPointTapListener(
-            (series, dataPoint) -> {
-              String msg =
-                  graphView.getContext().getString(org.runnerup.common.R.string.Distance)
-                      + ": "
-                      + xAxis.formatValue(dataPoint.getX())
-                      + "\n"
-                      + graphView.getContext().getString(org.runnerup.common.R.string.Heart_rate)
-                      + ": "
-                      + formatter.formatHeartRate(Formatter.Format.TXT_SHORT, dataPoint.getY());
-              Toast.makeText(graphView.getContext(), msg, Toast.LENGTH_SHORT).show();
-            });
-
-        if (showHRZhist) {
-          System.err.print("HR Zones:");
-          double sum = 0;
-          for (double aHrzHist : hrzHist) {
-            sum += aHrzHist;
-          }
-          for (int i = 0; i < hrzHist.length; i++) {
-            hrzHist[i] = hrzHist[i] / sum;
-            System.err.print(" " + hrzHist[i]);
-          }
-          Log.e(getClass().getName(), "\n");
-          hrzonesBar.pushHrzData(hrzHist);
-        }
-      }
-    }
-
-    private int[] getArgs(String s) {
-      try {
-        s = s.substring(s.indexOf('(') + 1);
-        s = s.substring(0, s.indexOf(')'));
-        String[] sargs = s.split(",");
-        int[] args = new int[sargs.length];
-        for (int i = 0; i < args.length; i++) {
-          args[i] = Integer.parseInt(sargs[i]);
-        }
-        return args;
-      } catch (Exception e) {
-        e.printStackTrace();
-        return new int[0];
-      }
-    }
-
-    public boolean HasPaceInfo() {
-      return showPace;
-    }
-
-    public boolean HasHRInfo() {
-      return showHR;
-    }
-
-    public boolean HasHRZHist() {
-      return showHR && showHRZhist;
-    }
-  }
-
-  private double calculateAverageHr(int[] data) {
-    int sum = 0;
-    int no = 0;
-
-    for (int aData : data) {
-      if (aData > 0) {
-        sum = sum + aData;
-        no++;
-      }
-    }
-    // TODO Average of pointe, not over time
-    if (no == 0) {
-      return 0;
-    } else {
-      return (double) sum / no;
-    }
-  }
-
-  class LoadParam {
-    public LoadParam(Context context, SQLiteDatabase mDB, long mID) {
-      this.context = context;
-      this.mDB = mDB;
-      this.mID = mID;
-    }
-
-    final Context context;
-    final SQLiteDatabase mDB;
-    final long mID;
-  }
-
-  boolean firstLoad = true;
-
-  @SuppressLint("StaticFieldLeak")
-  private class LoadGraph extends AsyncTask<LoadParam, Void, GraphProducer> {
-    @Override
-    protected GraphProducer doInBackground(LoadParam... params) {
-
-      LocationEntity.LocationList<LocationEntity> ll =
-          new LocationEntity.LocationList<>(params[0].mDB, params[0].mID);
-      GraphProducer graphData = new GraphProducer(params[0].context, ll.getCount());
-      double lastDistance = 0;
-      long lastTime = 0;
-      int lastLap = -1;
-      Double tot_distance = 0.0;
-      Double tot_time = 0.0;
-      int cnt = 0;
-      for (LocationEntity loc : ll) {
-        cnt++;
-        Long time = loc.getElapsed();
-        time = time != null ? time : lastTime;
-        if (time != null) {
-          tot_time = time.doubleValue();
-        }
-        Integer lap = loc.getLap();
-        lap = lap != null ? lap : 0;
-        tot_distance = tot_distance != null ? loc.getDistance() : lastDistance;
-
-        double tot_X = xAxis.getX(tot_distance, time);
-        if (lap != lastLap) {
-          graphData.clearSmooth(tot_X);
-          lastLap = lap;
-        }
-
-        graphData.addObservation(time - lastTime, tot_distance - lastDistance,
-                                 tot_X, loc);
-        lastTime = time;
-        lastDistance = tot_distance;
-      }
-      graphData.clearSmooth(xAxis.getX(tot_distance, tot_time));
-
-      ll.close();
-      Log.e(getClass().getName(), "Finished loading " + cnt + " points"
-            + " => " + graphData.velocityList.size() + " points");
-      return graphData;
-    }
-
-    @SuppressLint("ObsoleteSdkInt")
-    @Override
-    protected void onPostExecute(GraphProducer graphData) {
-      graphData.complete(graphView);
-      graphTab.removeView(graphView);
-      graphTab.removeView(graphView2);
-      if (graphData.HasPaceInfo() && !graphData.HasHRInfo()) {
-        graphTab.addView(graphView);
-      } else if (!graphData.HasPaceInfo() && graphData.HasHRInfo()) {
-        graphTab.addView(graphView2);
-      } else if (graphData.HasPaceInfo() && graphData.HasHRInfo()) {
-        graphTab.addView(graphView,
-                         new LayoutParams(LayoutParams.MATCH_PARENT, 0, 0.5f));
-
-        graphTab.addView(graphView2,
-                         new LayoutParams(LayoutParams.MATCH_PARENT, 0, 0.5f));
-      }
-
-      hrzonesBarLayout.removeView(hrzonesBar);
-      if (graphData.HasHRZHist()) {
-        hrzonesBarLayout.setVisibility(View.VISIBLE);
-        hrzonesBarLayout.addView(hrzonesBar);
-      } else {
-        hrzonesBarLayout.setVisibility(View.GONE);
-      }
-      if (!firstLoad) {
-        graphTab.invalidate();
-      } else {
-        firstLoad = false;
       }
     }
   }

@@ -26,8 +26,8 @@
         app:iconSpaceReserved="false">
 
         <Preference
-            android:key="@string/Maintenance_explanation_summary"
-            android:summary="@string/Maintenance_explanation_summary"
+            android:selectable="false"
+            android:summary="@string/Maintenance_explanation_summary_v2"
             app:iconSpaceReserved="false" />
 
         <Preference

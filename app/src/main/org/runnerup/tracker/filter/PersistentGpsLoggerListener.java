@@ -21,9 +21,8 @@ import android.content.ContentValues;
 import android.database.sqlite.SQLiteDatabase;
 import android.location.Location;
 import org.runnerup.common.util.Constants;
-import org.runnerup.tracker.LocationListenerBase;
 
-public class PersistentGpsLoggerListener extends LocationListenerBase implements Constants {
+public class PersistentGpsLoggerListener implements Constants {
   private final java.lang.Object mLock;
   private SQLiteDatabase mDB;
   private java.lang.String mTable;
@@ -109,9 +108,9 @@ public class PersistentGpsLoggerListener extends LocationListenerBase implements
       }
       // Most GPS chips also includes no of sats
       if (arg0.getExtras() != null) {
-        int sats = arg0.getExtras().getInt("satellites", -1);
-        if (sats >= 0) {
-          values.put(DB.LOCATION.SATELLITES, sats);
+        int satellites = arg0.getExtras().getInt("satellites", -1);
+        if (satellites >= 0) {
+          values.put(DB.LOCATION.SATELLITES, satellites);
         }
       }
       // Not accuracy related but unused by exporters

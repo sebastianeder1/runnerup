@@ -2,10 +2,10 @@ package org.runnerup.common.util;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.nullValue;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.IsEqual.equalTo;
-import static org.junit.Assert.assertThat;
-import static org.mockito.Matchers.anyObject;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -27,7 +27,7 @@ public class ValueModelTest {
   public void shouldCallListenerWithNullAsOldValueWhenCallingSet() {
     TestObject newValue = new TestObject();
 
-    ValueModel.ChangeListener<TestObject> listener = mock(ValueModel.ChangeListener.class);
+    ValueModel.ChangeListener<TestObject> listener = mockChangeListener();
     sut.registerChangeListener(listener);
 
     sut.set(newValue);
@@ -40,7 +40,7 @@ public class ValueModelTest {
     TestObject oldValue = new TestObject();
     TestObject newValue = new TestObject();
 
-    ValueModel.ChangeListener<TestObject> listener = mock(ValueModel.ChangeListener.class);
+    ValueModel.ChangeListener<TestObject> listener = mockChangeListener();
     sut.registerChangeListener(listener);
 
     sut.set(oldValue);
@@ -54,7 +54,7 @@ public class ValueModelTest {
   public void shouldNotCallListenerIfValueDidNotChange() {
     TestObject newValue = new TestObject();
 
-    ValueModel.ChangeListener<TestObject> listener = mock(ValueModel.ChangeListener.class);
+    ValueModel.ChangeListener<TestObject> listener = mockChangeListener();
     sut.registerChangeListener(listener);
 
     sut.set(newValue);
@@ -66,23 +66,23 @@ public class ValueModelTest {
 
   @Test
   public void shouldNotCallListenerIfValueIsNull() {
-    ValueModel.ChangeListener<TestObject> listener = mock(ValueModel.ChangeListener.class);
+    ValueModel.ChangeListener<TestObject> listener = mockChangeListener();
     sut.registerChangeListener(listener);
 
     sut.set(null);
 
-    verify(listener, never()).onValueChanged(eq(sut), anyObject(), anyObject());
+    verify(listener, never()).onValueChanged(eq(sut), any(), any());
   }
 
   @Test
   public void shouldNotCallListenerIfListenerIsRemoved() {
     TestObject newValue = new TestObject();
-    ValueModel.ChangeListener<TestObject> listener = mock(ValueModel.ChangeListener.class);
+    ValueModel.ChangeListener<TestObject> listener = mockChangeListener();
     sut.registerChangeListener(listener);
     sut.unregisterChangeListener(listener);
     sut.set(newValue);
 
-    verify(listener, never()).onValueChanged(eq(sut), anyObject(), anyObject());
+    verify(listener, never()).onValueChanged(eq(sut), any(), any());
   }
 
   @Test
@@ -93,6 +93,11 @@ public class ValueModelTest {
     assertThat(sut.get(), is(equalTo(newValue)));
   }
 
+  @SuppressWarnings("unchecked")
+  private ValueModel.ChangeListener<TestObject> mockChangeListener() {
+    return mock(ValueModel.ChangeListener.class);
+  }
+
   @Test
   public void shouldReturnNullIfNoValueSet() {
     assertThat(sut.get(), is(nullValue()));
@@ -101,9 +106,9 @@ public class ValueModelTest {
   @Test
   public void shouldNotCallListenersIfClearIsCalled() {
     TestObject newValue = new TestObject();
-    ValueModel.ChangeListener<TestObject> listener1 = mock(ValueModel.ChangeListener.class);
-    ValueModel.ChangeListener<TestObject> listener2 = mock(ValueModel.ChangeListener.class);
-    ValueModel.ChangeListener<TestObject> listener3 = mock(ValueModel.ChangeListener.class);
+    ValueModel.ChangeListener<TestObject> listener1 = mockChangeListener();
+    ValueModel.ChangeListener<TestObject> listener2 = mockChangeListener();
+    ValueModel.ChangeListener<TestObject> listener3 = mockChangeListener();
     sut.registerChangeListener(listener1);
     sut.registerChangeListener(listener2);
     sut.registerChangeListener(listener3);
@@ -112,17 +117,17 @@ public class ValueModelTest {
 
     sut.set(newValue);
 
-    verify(listener1, never()).onValueChanged(eq(sut), anyObject(), anyObject());
-    verify(listener2, never()).onValueChanged(eq(sut), anyObject(), anyObject());
-    verify(listener3, never()).onValueChanged(eq(sut), anyObject(), anyObject());
+    verify(listener1, never()).onValueChanged(eq(sut), any(), any());
+    verify(listener2, never()).onValueChanged(eq(sut), any(), any());
+    verify(listener3, never()).onValueChanged(eq(sut), any(), any());
   }
 
   @Test
   public void shouldCallMultipleListeners() {
     TestObject newValue = new TestObject();
-    ValueModel.ChangeListener<TestObject> listener1 = mock(ValueModel.ChangeListener.class);
-    ValueModel.ChangeListener<TestObject> listener2 = mock(ValueModel.ChangeListener.class);
-    ValueModel.ChangeListener<TestObject> listener3 = mock(ValueModel.ChangeListener.class);
+    ValueModel.ChangeListener<TestObject> listener1 = mockChangeListener();
+    ValueModel.ChangeListener<TestObject> listener2 = mockChangeListener();
+    ValueModel.ChangeListener<TestObject> listener3 = mockChangeListener();
     sut.registerChangeListener(listener1);
     sut.registerChangeListener(listener2);
     sut.registerChangeListener(listener3);
