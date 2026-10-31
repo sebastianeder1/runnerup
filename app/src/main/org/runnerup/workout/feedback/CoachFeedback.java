@@ -18,6 +18,8 @@
 package org.runnerup.workout.feedback;
 
 import android.content.Context;
+import android.content.Intent;
+
 import org.runnerup.R;
 import org.runnerup.util.Formatter;
 import org.runnerup.workout.Dimension;
@@ -62,12 +64,21 @@ public class CoachFeedback extends AudioFeedback {
 
     int cmp = sign * range.compare(val);
     String msg = "";
+    String subj = "";
     if (cmp < 0) {
       msg = " " + formatter.getCueString(R.string.cue_speedup);
+      subj = formatter.getCueString(R.string.cue_speedup);
     } else if (cmp > 0) {
       msg = " " + formatter.getCueString(R.string.cue_slowdown);
+      subj = formatter.getCueString(R.string.cue_slowdown);
     }
     if (!"".contentEquals(msg) && textToSpeech != null) {
+      Intent intent = new Intent("nodomain.freeyourgadget.gadgetbridge.command.DEBUG_SEND_NOTIFICATION");
+      intent.putExtra("sender", "RunnerUp");
+      intent.putExtra("subject", subj);
+      intent.putExtra("body", msg);
+      intent.setPackage("nodomain.freeyourgadget.gadgetbridge");
+      ctx.sendBroadcast(intent);
       textToSpeech.speak(
           formatter.getCueString(scope.getCueId())
               + " "

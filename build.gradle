@@ -103,7 +103,7 @@ project.ext {
         // Separate applicationId for the free version (must be first)
         applicationId = "org.runnerup.free"
     } else {
-        applicationId = "org.runnerup"
+        applicationId = "org.runnerup.free"
     }
 }
 

@@ -1,8 +1,6 @@
 apply plugin: 'com.android.application'
 
-def getGitHash = providers.exec {
-    commandLine('git', 'rev-parse', '--short', 'HEAD')
-}.standardOutput.asText.get().strip()
+def getGitHash = "my"
 
 android {
     buildToolsVersion = rootProject.ext.buildToolsVersion
@@ -64,24 +62,27 @@ android {
     }
 
     signingConfigs {
-        release {
-        }
+        //noinspection GroovyMissingReturnStatement
+        //release {
+        //}
     }
 
     buildTypes {
         debug {
             // Separate the debug build, sync with common/build.gradle
             applicationIdSuffix ".debug"
-            versionNameSuffix = "-${getGitHash}"
+            versionNameSuffix = "-my"
         }
         release {
-            debuggable = false
-            applicationIdSuffix = ""
+            debuggable true
+            minifyEnabled false
+            applicationIdSuffix ""
 
-            minifyEnabled = rootProject.ext.allowNonFree
-            shrinkResources = rootProject.ext.allowNonFree
+            //minifyEnabled rootProject.ext.allowNonFree
+            //shrinkResources rootProject.ext.allowNonFree
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard.txt'
-            signingConfig = signingConfigs.release
+            signingConfig signingConfigs.debug
+
         }
     }
     buildTypes.configureEach {
@@ -187,13 +188,95 @@ dependencies {
 def props = new Properties()
 // For locally signed builds only, Google Play signs the bundle
 if (rootProject.file("release.properties").exists()) {
-    props.load(new FileInputStream(rootProject.file("release.properties")))
+    //props.load(new FileInputStream(rootProject.file("release.properties")))
 
-    android.signingConfigs.release.storeFile rootProject.file(props.keyStore)
-    android.signingConfigs.release.storePassword props.keyStorePassword
-    android.signingConfigs.release.keyAlias props.keyAlias
-    android.signingConfigs.release.keyPassword props.keyAliasPassword
+    //android.signingConfigs.release.storeFile rootProject.file(props.keyStore)
+    //android.signingConfigs.release.storePassword props.keyStorePassword
+    //android.signingConfigs.release.keyAlias props.keyAlias
+    //android.signingConfigs.release.keyPassword props.keyAliasPassword
+    //android.buildTypes.release.signingConfig = null
+
 } else {
     project.logger.info('INFO: Set the values storeFile, storePassword, keyAlias, and keyPassword in release.properties to sign the release.')
-    android.buildTypes.release.signingConfig = null
+    //android.buildTypes.release.signingConfig = null
+}
+
+android.applicationVariants.configureEach {
+    // Note: As a minimum extra security at least obfuscate the strings with Proguard
+    if (rootProject.ext.noMap) {
+        buildConfigField 'boolean', 'USING_OSMDROID', "false"
+        buildConfigField 'int', 'MAPBOX_ENABLED', "0"
+        buildConfigField 'String', 'MAPBOX_ACCESS_TOKEN', '""'
+    } else if (rootProject.ext.useMapBox) {
+        // https://www.mapbox.com/account/
+        props.load(new FileInputStream(rootProject.file("mapbox.properties")))
+        buildConfigField 'int', 'MAPBOX_ENABLED', "1"
+        buildConfigField 'String', 'MAPBOX_ACCESS_TOKEN', props.mapboxAccessToken
+
+        buildConfigField 'boolean', 'USING_OSMDROID', "false"
+    } else {
+        buildConfigField 'int', 'MAPBOX_ENABLED', "0"
+        buildConfigField 'String', 'MAPBOX_ACCESS_TOKEN', '""'
+        buildConfigField 'boolean', 'USING_OSMDROID', "true"
+    }
+
+    if (rootProject.file("runalyze.properties").exists()) {
+        // Contact Runalyze team at https://forum.runalyze.com/
+        props.load(new FileInputStream(rootProject.file("runalyze.properties")))
+        buildConfigField 'int', 'RUNALYZE_ENABLED', "1"
+        buildConfigField 'String', 'RUNALYZE_ID', props.CLIENT_ID
+        buildConfigField 'String', 'RUNALYZE_SECRET', props.CLIENT_SECRET
+    } else {
+        // Demo, connect to testing.runalyze.com
+        buildConfigField 'int', 'RUNALYZE_ENABLED', "0"
+        buildConfigField 'String', 'RUNALYZE_ID', '"8_2jx5jt9r39ic40ooc80c8c0884okgk0owsowg808c4csg8ko8g"'
+        buildConfigField 'String', 'RUNALYZE_SECRET', '"1v7d6nwe1v9c8skok44g0gc8cc04cc0wwwo8swwgckoogwsww4"'
+    }
+
+    if (rootProject.file("dropbox.properties").exists()) {
+        // Create an app at https://www.dropbox.com/developers/apps/
+        // Dropbox API, App folder -> create app
+        // Enable additional users, Redirect URI:http://localhost:8080/runnerup/dropbox, Disallow implicit grant
+        // Set branding icon
+        // Create dropbox.properties with two lines:
+        //   CLIENT_ID="replace_dropbox_id"
+        //   CLIENT_SECRET="replace_dropbox_secret"
+        props.load(new FileInputStream(rootProject.file("dropbox.properties")))
+        buildConfigField 'int', 'DROPBOX_ENABLED', "1"
+        buildConfigField 'String', 'DROPBOX_ID', props.CLIENT_ID
+        buildConfigField 'String', 'DROPBOX_SECRET', props.CLIENT_SECRET
+    } else {
+        buildConfigField 'int', 'DROPBOX_ENABLED', "0"
+        buildConfigField 'String', 'DROPBOX_ID', "null"
+        buildConfigField 'String', 'DROPBOX_SECRET', "null"
+    }
+}
+
+//Based on an example from https://developer.android.com/studio/build/configure-apk-splits.html
+//Most comments from there removed
+
+// Map for the version code that gives each ABI a value (generic has lower value)
+ext.abiCodes = ['arm64-v8a': 8, 'armeabi': 2, 'armeabi-v7a': 3, 'mips': 4, 'mips64': 5, 'x86': 6, 'x86_64': 7]
+
+import com.android.build.OutputFile
+
+// For each APK output variant, override versionCode with a combination of
+// ext.abiCodes * 10000 + variant.versionCode. (universal gets no offset)
+android.applicationVariants.configureEach { variant ->
+    variant.outputs.each { output ->
+        def baseAbiVersionCode =
+                project.ext.abiCodes.get(output.getFilter(OutputFile.ABI))
+
+        if (baseAbiVersionCode != null) {
+            output.versionCodeOverride =
+                    baseAbiVersionCode * 10000 + variant.versionCode
+        }
+    }
+}
+
+task wrapper(type: Wrapper){
+    gradleVersion = '7.2'
+}
+task prepareKotlinBuildScriptModel {
+
 }
