@@ -1,43 +1,29 @@
 package org.runnerup.hr;
 
 import android.content.Context;
+import android.content.Intent;
 import android.os.Handler;
 import android.os.SystemClock;
+import androidx.activity.result.ActivityResultLauncher;
 import androidx.appcompat.app.AppCompatActivity;
 
 public class MockHRProvider implements HRProvider {
 
+  public static final String NAME = "MockHR";
   private HRClient hrClient = null;
   private Handler hrClientHandler = null;
-  public static final String NAME = "MockHR";
+  private boolean mIsScanning = false;
+  private boolean mIsConnecting = false;
+  private boolean mIsConnected = false;
+  private int hrValue = 0;
+  private long hrTimestamp = 0;
+  private long hrElapsedRealtime = 0;
 
   public MockHRProvider(Context ctx) {}
 
   @Override
   public String getName() {
     return "MockHR";
-  }
-
-  @Override
-  public String getProviderName() {
-    return "MockHR";
-  }
-
-  @Override
-  public void open(Handler handler, HRClient hrClient) {
-    this.hrClient = hrClient;
-    this.hrClientHandler = handler;
-    hrClient.onOpenResult(true);
-  }
-
-  @Override
-  public void close() {}
-
-  private boolean mIsScanning = false;
-
-  @Override
-  public boolean isScanning() {
-    return mIsScanning;
   }
 
   private final Runnable fakeScanResult =
@@ -60,6 +46,26 @@ public class MockHRProvider implements HRProvider {
       };
 
   @Override
+  public String getProviderName() {
+    return "MockHR";
+  }
+
+  @Override
+  public void open(Handler handler, HRClient hrClient) {
+    this.hrClient = hrClient;
+    this.hrClientHandler = handler;
+    hrClient.onOpenResult(true);
+  }
+
+  @Override
+  public void close(String from) {}
+
+  @Override
+  public boolean isScanning() {
+    return mIsScanning;
+  }
+
+  @Override
   public void startScan() {
     mIsScanning = true;
     hrClientHandler.postDelayed(fakeScanResult, 3000);
@@ -70,9 +76,6 @@ public class MockHRProvider implements HRProvider {
     mIsScanning = false;
   }
 
-  private boolean mIsConnecting = false;
-  private boolean mIsConnected = false;
-
   @Override
   public boolean isConnected() {
     return mIsConnected;
@@ -82,6 +85,19 @@ public class MockHRProvider implements HRProvider {
   public boolean isConnecting() {
     return mIsConnecting;
   }
+
+  private final Runnable hrUpdate =
+      new Runnable() {
+        @Override
+        public void run() {
+          hrValue = (int) (120 + SystemClock.elapsedRealtime() / 1000.0 % 40 + 3 * Math.random());
+          hrTimestamp = System.currentTimeMillis();
+          hrElapsedRealtime = SystemClock.elapsedRealtimeNanos();
+          if (mIsConnected) {
+            hrClientHandler.postDelayed(hrUpdate, 750);
+          }
+        }
+      };
 
   @Override
   public void connect(HRDeviceRef ref) {
@@ -102,28 +118,11 @@ public class MockHRProvider implements HRProvider {
         3000);
   }
 
-  private final Runnable hrUpdate =
-      new Runnable() {
-        @Override
-        public void run() {
-          hrValue = (int) (120 + SystemClock.elapsedRealtime() / 1000.0 % 40 + 3 * Math.random());
-          hrTimestamp = System.currentTimeMillis();
-          hrElapsedRealtime = SystemClock.elapsedRealtimeNanos();
-          if (mIsConnected) {
-            hrClientHandler.postDelayed(hrUpdate, 750);
-          }
-        }
-      };
-
   @Override
   public void disconnect() {
     mIsConnecting = false;
     mIsConnected = false;
   }
-
-  private int hrValue = 0;
-  private long hrTimestamp = 0;
-  private long hrElapsedRealtime = 0;
 
   @Override
   public int getHRValue() {
@@ -165,7 +164,8 @@ public class MockHRProvider implements HRProvider {
   }
 
   @Override
-  public boolean startEnableIntent(AppCompatActivity activity, int requestCode) {
+  public boolean startEnableIntent(
+      AppCompatActivity activity, ActivityResultLauncher<Intent> launcher) {
     return false;
   }
 }

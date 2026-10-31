@@ -26,6 +26,7 @@ import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.SpinnerAdapter;
 import android.widget.TextView;
+import androidx.core.content.ContextCompat;
 import org.runnerup.R;
 
 public class TitleSpinner extends LinearLayout implements SpinnerInterface {
@@ -38,8 +39,7 @@ public class TitleSpinner extends LinearLayout implements SpinnerInterface {
   public TitleSpinner(Context context, AttributeSet attrs) {
     super(context, attrs);
 
-    LayoutInflater inflater =
-        (LayoutInflater) context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+    LayoutInflater inflater = ContextCompat.getSystemService(context, LayoutInflater.class);
     inflater.inflate(R.layout.title_spinner, this);
 
     mLayout = findViewById(R.id.title_spinner_layout);
@@ -169,8 +169,8 @@ public class TitleSpinner extends LinearLayout implements SpinnerInterface {
 
   // Instead of android:entries="@array/anArray"
   public void setArrayEntries(String[] entries) {
-    var adapter = new ArrayAdapter<CharSequence>(
-        getContext(), android.R.layout.simple_spinner_item, entries);
+    var adapter =
+        new ArrayAdapter<CharSequence>(getContext(), android.R.layout.simple_spinner_item, entries);
     adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
     mSpinner.setAdapter(adapter);
   }

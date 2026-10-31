@@ -18,9 +18,9 @@
 package org.runnerup.view;
 
 import android.annotation.SuppressLint;
-import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.util.Pair;
 import android.view.KeyEvent;
@@ -29,13 +29,17 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
+import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
+import androidx.core.view.WindowCompat;
 import java.util.Locale;
 import java.util.Vector;
 import org.runnerup.R;
@@ -165,9 +169,13 @@ public class HRZonesActivity extends AppCompatActivity implements Constants {
 
   @Override
   public void onCreate(Bundle savedInstanceState) {
+    EdgeToEdge.enable(this);
+    Window window = getWindow();
+    WindowCompat.getInsetsController(window, window.getDecorView())
+        .setAppearanceLightStatusBars(false);
     super.onCreate(savedInstanceState);
     setContentView(R.layout.heartratezones);
-    WidgetUtil.addLegacyOverflowButton(getWindow());
+    WidgetUtil.addLegacyOverflowButton(window);
 
     hrZones = new HRZones(this);
     hrZoneCalculator = new HRZoneCalculator(this);
@@ -177,7 +185,7 @@ public class HRZonesActivity extends AppCompatActivity implements Constants {
     TableLayout zonesTable = findViewById(R.id.zones_table);
     {
       int zoneCount = hrZoneCalculator.getZoneCount();
-      LayoutInflater inflator = (LayoutInflater) getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+      LayoutInflater inflator = ContextCompat.getSystemService(this, LayoutInflater.class);
       zones.clear();
       for (int i = 0; i < zoneCount; i++) {
         View row = addZoneRow(inflator, zonesTable, i + 1);
@@ -244,7 +252,7 @@ public class HRZonesActivity extends AppCompatActivity implements Constants {
         EditText hi = zones.get(2 * zone + 1);
         lo.setText(String.format(Locale.getDefault(), "%d", values.first));
         hi.setText(String.format(Locale.getDefault(), "%d", values.second));
-        Log.e(
+        Log.i(
             getClass().getName(),
             "loaded " + (zone + 1) + " " + values.first + "-" + values.second);
       }
@@ -252,7 +260,7 @@ public class HRZonesActivity extends AppCompatActivity implements Constants {
   }
 
   private void recomputeMaxHR() {
-    new Handler()
+    new Handler(Looper.getMainLooper())
         .post(
             () -> {
               try {
@@ -268,7 +276,7 @@ public class HRZonesActivity extends AppCompatActivity implements Constants {
   }
 
   private void recomputeZones() {
-    new Handler()
+    new Handler(Looper.getMainLooper())
         .post(
             () -> {
               try {
@@ -291,13 +299,14 @@ public class HRZonesActivity extends AppCompatActivity implements Constants {
   private void saveHR() {
     try {
       Vector<Integer> vals = new Vector<>();
-      System.err.print("saving: ");
+      StringBuilder s = new StringBuilder("saving:");
       for (int i = 0; i < zones.size(); i += 2) {
         vals.add(Integer.valueOf(zones.get(i).getText().toString()));
-        System.err.print(" " + vals.lastElement());
+        s.append(" ").append(vals.lastElement());
       }
       vals.add(Integer.valueOf(zones.lastElement().getText().toString()));
-      Log.e(getClass().getName(), " " + vals.lastElement());
+      s.append(" ").append(vals.lastElement());
+      Log.d(getClass().getName(), s.toString());
       hrZones.save(vals);
     } catch (Exception ex) {
     }

@@ -11,6 +11,7 @@ import android.content.res.Resources;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 import android.speech.tts.TextToSpeech;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -21,6 +22,8 @@ import android.widget.EditText;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
+import androidx.core.view.MenuHost;
+import androidx.core.view.MenuProvider;
 import androidx.preference.Preference;
 import androidx.preference.Preference.OnPreferenceClickListener;
 import androidx.preference.PreferenceFragmentCompat;
@@ -56,14 +59,41 @@ public class AudioCueSettingsFragment extends PreferenceFragmentCompat {
     super.onCreate(savedInstanceState);
     mDB = DBHelper.getWritableDatabase(requireContext());
     DEFAULT = getString(org.runnerup.common.R.string.Default);
-    setHasOptionsMenu(true); // this fragment has menu items
+  }
+
+  private String sanitizeSettingsName(String name) {
+    if (name == null) return null;
+    return name.replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}]", "_");
   }
 
   @Override
   public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
-    settingsName = requireArguments().getString("name");
+    String optionName = requireArguments().getString("name");
+    settingsName = sanitizeSettingsName(optionName);
 
     if (settingsName != null) {
+      if (!settingsName.equals(optionName)) {
+        // illegal names could previously be created, raised exceptions
+        Log.d(getClass().getName(), "Audio cue name contains illegal characters: " + optionName);
+        settingsName = optionName;
+        new AlertDialog.Builder(requireContext())
+            .setMessage(org.runnerup.common.R.string.Delete_audio_cue)
+            .setPositiveButton(
+                org.runnerup.common.R.string.Yes,
+                (dialog, which) -> {
+                  dialog.dismiss();
+                  deleteAudioScheme();
+                })
+            .setNegativeButton(
+                org.runnerup.common.R.string.No,
+                (dialog, which) -> {
+                  // Do nothing but close the dialog
+                  dialog.dismiss();
+                })
+            .show();
+        return;
+      }
+
       PreferenceManager prefMgr = getPreferenceManager();
       prefMgr.setSharedPreferencesName(settingsName + SUFFIX);
       prefMgr.setSharedPreferencesMode(MODE_PRIVATE);
@@ -136,6 +166,37 @@ public class AudioCueSettingsFragment extends PreferenceFragmentCompat {
   @Override
   public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
     super.onViewCreated(view, savedInstanceState);
+    MenuHost menuHost = requireActivity();
+    menuHost.addMenuProvider(
+        new MenuProvider() {
+          @Override
+          public void onCreateMenu(@NonNull Menu menu, @NonNull MenuInflater menuInflater) {
+            newSettings = menu.add("New settings");
+            MenuItem deleteMenuItem = menu.add("Delete settings");
+            if (settingsName == null) deleteMenuItem.setEnabled(false);
+          }
+
+          @Override
+          public boolean onMenuItemSelected(@NonNull MenuItem item) {
+            if (item == newSettings) {
+              createNewAudioSchemeDialog();
+              return true;
+            }
+            new AlertDialog.Builder(requireContext())
+                .setMessage(org.runnerup.common.R.string.Delete_audio_cue)
+                .setPositiveButton(
+                    org.runnerup.common.R.string.Yes,
+                    (dialog, which) -> {
+                      dialog.dismiss();
+                      deleteAudioScheme();
+                    })
+                .setNegativeButton(
+                    org.runnerup.common.R.string.No, (dialog, which) -> dialog.dismiss())
+                .show();
+            return true;
+          }
+        },
+        getViewLifecycleOwner());
 
     {
       TitleSpinner spinner = view.findViewById(R.id.settings_spinner);
@@ -169,37 +230,6 @@ public class AudioCueSettingsFragment extends PreferenceFragmentCompat {
     DBHelper.closeDB(mDB);
   }
 
-  @Override
-  public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
-    newSettings = menu.add("New settings");
-    MenuItem deleteMenuItem = menu.add("Delete settings");
-    if (settingsName == null) deleteMenuItem.setEnabled(false);
-  }
-
-  @Override
-  public boolean onOptionsItemSelected(MenuItem item) {
-    if (item == newSettings) {
-      createNewAudioSchemeDialog();
-      return true;
-    }
-    new AlertDialog.Builder(requireContext())
-        .setMessage(org.runnerup.common.R.string.Are_you_sure)
-        .setPositiveButton(
-            org.runnerup.common.R.string.Yes,
-            (dialog, which) -> {
-              dialog.dismiss();
-              deleteAudioScheme();
-            })
-        .setNegativeButton(
-            org.runnerup.common.R.string.No,
-            (dialog, which) -> {
-              // Do nothing but close the dialog
-              dialog.dismiss();
-            })
-        .show();
-    return true;
-  }
-
   private void createNewAudioScheme(String scheme) {
     ContentValues tmp = new ContentValues();
     tmp.put(Constants.DB.AUDIO_SCHEMES.NAME, scheme);
@@ -223,7 +253,7 @@ public class AudioCueSettingsFragment extends PreferenceFragmentCompat {
                 + File.separator
                 + PREFS_DIR
                 + "/"
-                + name
+                + sanitizeSettingsName(name)
                 + SUFFIX
                 + ".xml");
     //noinspection ResultOfMethodCallIgnored
@@ -291,6 +321,7 @@ public class AudioCueSettingsFragment extends PreferenceFragmentCompat {
     }
 
     if (name != null && settingsName != null && name.contentEquals(settingsName)) {
+      Log.e(getClass().getName(), "Settings name: " + settingsName + " do not match: " + name);
       return;
     }
 
@@ -320,11 +351,18 @@ public class AudioCueSettingsFragment extends PreferenceFragmentCompat {
             org.runnerup.common.R.string.OK,
             (dialog, which) -> {
               String scheme = editText.getText().toString();
-              if (!scheme.contentEquals("")) {
-                createNewAudioScheme(scheme);
-                updateSortOrder(scheme);
-                switchTo(scheme);
+              if (!scheme.equals(sanitizeSettingsName(scheme))
+                  || scheme.isEmpty()
+                  || scheme.contains("/")
+                  || scheme.contains("\\")
+                  || scheme.contains("..")) {
+                Log.d(
+                    getClass().getName(), "Audio cue name contains illegal characters: " + scheme);
+                return;
               }
+              createNewAudioScheme(scheme);
+              updateSortOrder(scheme);
+              switchTo(scheme);
             })
         .setNegativeButton(org.runnerup.common.R.string.Cancel, (dialog, which) -> {})
         .show();
@@ -351,13 +389,13 @@ public class AudioCueSettingsFragment extends PreferenceFragmentCompat {
                 return;
               }
 
+              Context context = getContext();
+              if (context == null) return;
               SharedPreferences prefs;
               if (settingsName == null || settingsName.contentEquals(DEFAULT))
-                prefs = PreferenceManager.getDefaultSharedPreferences(requireContext());
+                prefs = PreferenceManager.getDefaultSharedPreferences(context);
               else
-                prefs =
-                    requireContext()
-                        .getSharedPreferences(settingsName + SUFFIX, Context.MODE_PRIVATE);
+                prefs = context.getSharedPreferences(settingsName + SUFFIX, Context.MODE_PRIVATE);
               final boolean mute =
                   prefs.getBoolean(getResources().getString(R.string.pref_mute_bool), false);
 

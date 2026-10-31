@@ -143,7 +143,6 @@
   <string name="Smooth_pace_filters">Glatte hastighetsfilter</string>
   <string name="Poll_interval_ms">Samplingsintervall (ms)</string>
   <string name="Poll_distance_m">Samplingsdistanse (m)</string>
-  <string name="Adjust_altitude">Juster GPS-høyde til geoide (EGM96)</string>
   <string name="Export">Eksporter</string>
   <string name="Import">Importer</string>
   <string name="Experimental_HRM_devices">Eksperimentelle HRM-enheter</string>
@@ -228,11 +227,10 @@
   <string name="use_step_sensor_summary">Bruk for takt</string>
   <string name="use_temperature_sensor">Temperatursensor</string>
   <string name="use_pressure_sensor_title">Trykksensor</string>
-  <string name="adjust_barometer_altitude_from_gps">Juster barometerhøyde til GPS-høyde</string>
-  <string name="adjust_barometer_elevation_from_gps_summary">Bruk opprinnelig GPS-høyde til gjennomsnitt for barometrisk høyde</string>
   <!--Preference categories & summaries-->
   <string name="HRM_category">Hjerterytme</string>
   <string name="Autopause_category">Autopause</string>
   <string name="Target_category">Målhjelpetrener</string>
   <string name="Activity_ongoing">Aktivitet pågår</string>
+  <!--Name of sports, these deprecate array.sportEntries-->
 </resources>

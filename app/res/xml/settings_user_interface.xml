@@ -21,8 +21,8 @@
     android:layout_height="fill_parent">
 
     <PreferenceCategory
-        android:key="@string/Lock_activity_buttons_category"
-        android:title="@string/Lock_activity_buttons_category"
+        android:key="@string/Buttons_category"
+        android:title="@string/Buttons_category"
         app:iconSpaceReserved="false">
 
         <CheckBoxPreference
@@ -31,6 +31,36 @@
             android:persistent="true"
             android:summary="@string/Lock_activity_buttons_message"
             android:title="@string/Lock_activity_buttons"
+            app:iconSpaceReserved="false" />
+
+        <CheckBoxPreference
+            android:defaultValue="false"
+            android:key="@string/pref_volume_button_controls"
+            android:persistent="true"
+            android:summary="@string/Volume_button_controls_summary"
+            android:title="@string/Volume_button_controls"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:key="@string/Visibility_category"
+        android:title="@string/Visibility_category"
+        app:iconSpaceReserved="false">
+
+        <CheckBoxPreference
+            android:defaultValue="true"
+            android:key="@string/pref_show_on_lock_screen"
+            android:persistent="true"
+            android:summary="@string/Show_on_lock_screen_summary"
+            android:title="@string/Show_on_lock_screen"
+            app:iconSpaceReserved="false" />
+
+        <CheckBoxPreference
+            android:defaultValue="false"
+            android:key="@string/pref_keep_screen_on"
+            android:persistent="true"
+            android:summary="@string/Keep_screen_on_summary"
+            android:title="@string/Keep_screen_on"
             app:iconSpaceReserved="false" />
     </PreferenceCategory>
 

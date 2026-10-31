@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Locale;
 import org.runnerup.R;
 import org.runnerup.common.util.Constants;
+import org.runnerup.util.SafeParse;
 
 /** Wrapper for com.goebl.simplify.Simplify. */
 public class PathSimplifier {
@@ -58,7 +59,7 @@ public class PathSimplifier {
    * <p>https://github.com/hgoebl/simplify-java
    */
   private static final PointExtractor<Location> locationPointExtractor =
-      new PointExtractor<Location>() {
+      new PointExtractor<>() {
         @Override
         public double getX(Location point) {
           return point.getLatitude() * PathSimplifier.MULTIPLIER;
@@ -82,16 +83,13 @@ public class PathSimplifier {
     // get user settings
 
     // tolerance in meters (default to R.string.path_simplification_default_tolerance)
-    double tolerance;
-    try {
-      tolerance =
-          Double.parseDouble(
-              prefs.getString(
-                  res.getString(R.string.pref_path_simplification_tolerance),
-                  res.getString(R.string.path_simplification_default_tolerance)));
-    } catch (Exception ex) {
-      tolerance = Double.parseDouble(res.getString(R.string.path_simplification_default_tolerance));
-    }
+    double tolerance =
+        SafeParse.parseDouble(
+            prefs.getString(
+                res.getString(R.string.pref_path_simplification_tolerance),
+                res.getString(R.string.path_simplification_default_tolerance)),
+            SafeParse.parseDouble(
+                res.getString(R.string.path_simplification_default_tolerance), 3.0));
     // squared tolerance in meters has to be transformed to tolerance in degrees
     this.toleranceDeg = tolerance / ONE_DEGREE;
 
@@ -163,7 +161,8 @@ public class PathSimplifier {
         "_id",
         Constants.DB.LOCATION.LATITUDE,
         Constants.DB.LOCATION.LONGITUDE,
-        Constants.DB.LOCATION.TYPE
+        Constants.DB.LOCATION.TYPE,
+        Constants.DB.LOCATION.LAP
       };
 
       // get table from database
@@ -183,13 +182,16 @@ public class PathSimplifier {
       idsStr = new ArrayList<>();
       // Location IDs to remove from the activity
       ArrayList<String> simplifiedIDs = new ArrayList<>();
+      int lap = 0;
+      int lap_prev = -1;
 
       if (c.moveToFirst()) {
         do {
           int lstate = c.getInt(3);
+          lap = c.getInt(4);
 
           // Only TYPE_GPS locations are considered for simplification
-          if (lstate == Constants.DB.LOCATION.TYPE_GPS) {
+          if (lstate == Constants.DB.LOCATION.TYPE_GPS && lap == lap_prev) {
             // save ID of the location entry
             Location l = new Location(String.format(Locale.US, "%d", c.getInt(0)));
             // get location's coordinates
@@ -198,8 +200,10 @@ public class PathSimplifier {
             idsStr.add(l.getProvider());
             locations.add(l);
 
-          } else if ((lstate == Constants.DB.LOCATION.TYPE_PAUSE)
-              || (lstate == Constants.DB.LOCATION.TYPE_END)) {
+          } else if (((lstate == Constants.DB.LOCATION.TYPE_PAUSE)
+                  || (lstate == Constants.DB.LOCATION.TYPE_END))
+              // also keep first and last location of a lap to preserve lap information
+              || (lstate == Constants.DB.LOCATION.TYPE_GPS)) {
             // this is the end of a segment
 
             // simplify current segment
@@ -208,6 +212,8 @@ public class PathSimplifier {
             for (Location sl : simplifiedLocations) {
               simplifiedIDs.add(sl.getProvider());
             }
+
+            lap_prev = lap;
 
             // start new segment
             locations = new ArrayList<>();

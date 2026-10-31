@@ -26,8 +26,11 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.Window;
 import android.widget.EditText;
+import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.WindowCompat;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.util.Calendar;
@@ -59,6 +62,10 @@ public class ManualActivity extends AppCompatActivity {
   /** Called when the activity is first created. */
   @Override
   public void onCreate(Bundle savedInstanceState) {
+    EdgeToEdge.enable(this);
+    Window window = getWindow();
+    WindowCompat.getInsetsController(window, window.getDecorView())
+        .setAppearanceLightStatusBars(false);
     super.onCreate(savedInstanceState);
 
     mDB = DBHelper.getWritableDatabase(this);
@@ -110,18 +117,18 @@ public class ManualActivity extends AppCompatActivity {
     super.onActivityResult(requestCode, resultCode, data);
     if (data != null) {
       if (data.getStringExtra("url") != null)
-        Log.e(
+        Log.d(
             getClass().getName(), "data.getStringExtra(\"url\") => " + data.getStringExtra("url"));
       if (data.getStringExtra("ex") != null)
-        Log.e(getClass().getName(), "data.getStringExtra(\"ex\") => " + data.getStringExtra("ex"));
+        Log.d(getClass().getName(), "data.getStringExtra(\"ex\") => " + data.getStringExtra("ex"));
       if (data.getStringExtra("obj") != null)
-        Log.e(
+        Log.d(
             getClass().getName(), "data.getStringExtra(\"obj\") => " + data.getStringExtra("obj"));
     }
   }
 
   void setManualPace(String distance, String duration) {
-    Log.e(getClass().getName(), "distance: >" + distance + "< duration: >" + duration + "<");
+    Log.d(getClass().getName(), "distance: >" + distance + "< duration: >" + duration + "<");
     double dist = SafeParse.parseDouble(distance, 0); // convert to meters
     long seconds = SafeParse.parseSeconds(duration, 0);
     if (seconds == 0) {
@@ -178,7 +185,7 @@ public class ManualActivity extends AppCompatActivity {
     }
     double dist = 0;
     if (distance.length() > 0) {
-      dist = Double.parseDouble(distance.toString()); // convert to
+      dist = SafeParse.parseDouble(distance.toString(), 0.0); // convert to
       // meters
       save.put(DB.ACTIVITY.DISTANCE, dist);
     }

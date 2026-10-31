@@ -18,7 +18,6 @@
 package org.runnerup.view;
 
 import android.annotation.SuppressLint;
-import android.app.Service;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -27,21 +26,28 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.res.AssetManager;
+import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.view.Window;
 import android.webkit.WebView;
 import android.widget.Toast;
+import androidx.activity.EdgeToEdge;
 import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
+import androidx.core.content.pm.PackageInfoCompat;
+import androidx.core.view.WindowCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.lifecycle.Lifecycle;
@@ -75,8 +81,14 @@ public class MainLayout extends AppCompatActivity {
 
   @Override
   public void onCreate(Bundle savedInstanceState) {
+    EdgeToEdge.enable(this);
+    Window window = getWindow();
+    WindowCompat.getInsetsController(window, window.getDecorView())
+        .setAppearanceLightStatusBars(false);
     super.onCreate(savedInstanceState);
-    setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+    if (!isLargeScreen()) {
+      setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+    }
     setContentView(R.layout.main);
 
     int versionCode = 0;
@@ -85,7 +97,7 @@ public class MainLayout extends AppCompatActivity {
     Editor editor = pref.edit();
     try {
       PackageInfo pInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
-      versionCode = pInfo.versionCode;
+      versionCode = (int) PackageInfoCompat.getLongVersionCode(pInfo);
       int version = pref.getInt("app-version", -1);
       if (version == -1) {
         upgradeState = UpgradeState.NEW;
@@ -112,7 +124,7 @@ public class MainLayout extends AppCompatActivity {
     // clear basicTargetType between application startup/shutdown
     pref.edit().remove(getString(R.string.pref_basic_target_type)).apply();
 
-    Log.e(
+    Log.i(
         getClass().getName(),
         "app-version: " + versionCode + ", upgradeState: " + upgradeState + ", km: " + km);
 
@@ -130,7 +142,7 @@ public class MainLayout extends AppCompatActivity {
 
     PreferenceManager.setDefaultValues(this, R.xml.settings, false);
     PreferenceManager.setDefaultValues(this, R.xml.audio_cue_settings, true);
-    PreferenceManager.setDefaultValues(this, R.xml.settings_controls, true);
+    PreferenceManager.setDefaultValues(this, R.xml.settings_user_interface, true);
     PreferenceManager.setDefaultValues(this, R.xml.settings_graph, true);
     PreferenceManager.setDefaultValues(this, R.xml.settings_maintenance, true);
     PreferenceManager.setDefaultValues(this, R.xml.settings_map, true);
@@ -192,7 +204,7 @@ public class MainLayout extends AppCompatActivity {
     if (filePath != null) {
       // No check for permissions or that this is within scooped storage (>=SDK29)
       Log.i(getClass().getSimpleName(), "Importing database from " + filePath);
-      DBHelper.importDatabase(MainLayout.this, filePath);
+      DBHelper.importDatabase(MainLayout.this, Uri.parse(filePath));
     }
 
     // Apply system bars insets to avoid UI overlap
@@ -200,6 +212,12 @@ public class MainLayout extends AppCompatActivity {
 
     // Handle back navigation
     getOnBackPressedDispatcher().addCallback(this, onBackPressed);
+  }
+
+  private boolean isLargeScreen() {
+    int screenSize =
+        getResources().getConfiguration().screenLayout & Configuration.SCREENLAYOUT_SIZE_MASK;
+    return screenSize >= Configuration.SCREENLAYOUT_SIZE_LARGE;
   }
 
   /**
@@ -243,7 +261,7 @@ public class MainLayout extends AppCompatActivity {
                   Toast.LENGTH_SHORT)
               .show();
 
-          new Handler().postDelayed(() -> this.setEnabled(true), 3 * 1000);
+          new Handler(Looper.getMainLooper()).postDelayed(() -> this.setEnabled(true), 3 * 1000);
         }
       };
 
@@ -295,15 +313,15 @@ public class MainLayout extends AppCompatActivity {
           // Normal, src is directory for first call
         }
 
-        Log.v(getClass().getName(), "Found: " + src + ", " + dst + ", isFile: " + isFile);
+        Log.d(getClass().getName(), "Found: " + src + ", " + dst + ", isFile: " + isFile);
 
         if (!isFile) {
           // The request is hierarchical, source is still on a directory level
-          File dstDir = new File(dstBase);
+          File dstDir = new File(dst);
           //noinspection ResultOfMethodCallIgnored
           dstDir.mkdir();
           if (!dstDir.isDirectory()) {
-            Log.w(
+            Log.i(
                 getClass().getName(),
                 "Failed to copy " + src + " as \"" + dstBase + "\" is not a directory!");
             continue;
@@ -313,7 +331,7 @@ public class MainLayout extends AppCompatActivity {
           // Source is a file, ready to copy
           File dstFile = new File(dst);
           if (dstFile.isDirectory() || dstFile.isFile()) {
-            Log.v(
+            Log.d(
                 getClass().getName(),
                 "Skip: "
                     + dst
@@ -328,18 +346,17 @@ public class MainLayout extends AppCompatActivity {
           String key = "install_bundled_" + add;
           SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(this);
           if (pref.contains(key)) {
-            Log.v(getClass().getName(), "Skip already existing pref: " + key);
+            Log.d(getClass().getName(), "Skip already existing pref: " + key);
             continue;
           }
 
-          pref.edit().putBoolean(key, true).apply();
-
-          Log.v(getClass().getName(), "Copying: " + dst);
+          Log.d(getClass().getName(), "Copying: " + dst);
           InputStream input = null;
           try {
             input = mgr.open(src);
             FileUtil.copy(input, dst);
             handleHooks(add);
+            pref.edit().putBoolean(key, true).apply(); // Store successfull copy
           } catch (IOException e) {
             e.printStackTrace();
           } finally {
@@ -376,7 +393,7 @@ public class MainLayout extends AppCompatActivity {
       };
 
   private void whatsNew() {
-    LayoutInflater inflater = (LayoutInflater) getSystemService(Service.LAYOUT_INFLATER_SERVICE);
+    LayoutInflater inflater = ContextCompat.getSystemService(this, LayoutInflater.class);
     @SuppressLint("InflateParams")
     View view = inflater.inflate(R.layout.whatsnew, null);
     WebView wv = view.findViewById(R.id.web_view1);
