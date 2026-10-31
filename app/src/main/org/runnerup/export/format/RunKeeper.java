@@ -48,6 +48,7 @@ import org.runnerup.db.entities.LapEntity;
 import org.runnerup.db.entities.LocationEntity;
 import org.runnerup.export.RunKeeperSynchronizer;
 import org.runnerup.util.JsonWriter;
+import org.runnerup.util.SafeParse;
 import org.runnerup.workout.Sport;
 
 /**
@@ -87,7 +88,7 @@ public class RunKeeper {
       w.name("start_time").value(formatTime(startTime * 1000));
       w.name("total_distance").value(distance);
       w.name("duration").value(duration);
-      if (comment != null && comment.length() > 0) {
+      if (comment != null && !comment.isEmpty()) {
         w.name("notes").value(comment);
       }
       // it seems that upload fails if writting an empty array...
@@ -182,7 +183,7 @@ public class RunKeeper {
       newActivity.setComment(response.getString("notes"));
     }
     newActivity.setTime((long) Float.parseFloat(response.getString("duration")));
-    newActivity.setDistance(Double.parseDouble(response.getString("total_distance")));
+    newActivity.setDistance(SafeParse.parseDouble(response.getString("total_distance"), 0.0));
 
     String startTime = response.getString("start_time");
     SimpleDateFormat format = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss", Locale.US);

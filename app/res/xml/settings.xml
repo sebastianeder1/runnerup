@@ -1,5 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!--
+<?xml version="1.0" encoding="utf-8"?><!--
   ~ Copyright (C) 2012 - 2013 jonas.oreland@gmail.com
   ~
   ~  This program is free software: you can redistribute it and/or modify
@@ -38,13 +37,13 @@
         app:fragment="org.runnerup.view.SettingsSensorsFragment"
         app:iconSpaceReserved="false" />
 
-    <!--Controls -->
+    <!--User interface -->
 
     <Preference
-        android:key="controls_preferencescreen"
-        android:summary="@string/Controls_pref_summary"
-        android:title="@string/Controls"
-        app:fragment="org.runnerup.view.SettingsControlsFragment"
+        android:key="userinterface_preferencescreen"
+        android:summary="@string/User_interface_pref_summary"
+        android:title="@string/User_interface"
+        app:fragment="org.runnerup.view.SettingsUserInterfaceFragment"
         app:iconSpaceReserved="false" />
 
     <!--Workout -->

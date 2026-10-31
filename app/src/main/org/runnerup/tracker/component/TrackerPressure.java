@@ -23,6 +23,7 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import androidx.core.content.ContextCompat;
 import androidx.preference.PreferenceManager;
 import java.util.Random;
 
@@ -76,7 +77,7 @@ public class TrackerPressure extends DefaultTrackerComponent implements SensorEv
   private Sensor getSensor(final Context context) {
     Sensor sensor;
     if (sensorManager == null) {
-      sensorManager = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
+      sensorManager = ContextCompat.getSystemService(context, SensorManager.class);
     }
     sensor = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE);
     if (sensor == null) {
@@ -101,6 +102,7 @@ public class TrackerPressure extends DefaultTrackerComponent implements SensorEv
   public ResultCode onConnecting(final Callback callback, final Context context) {
     ResultCode res;
     final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+    // pressure assumed to only be used for altitude - extra logging is a bonus
     boolean enabled =
         prefs.getBoolean(context.getString(org.runnerup.R.string.pref_use_pressure_sensor), false);
 

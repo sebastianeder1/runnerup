@@ -19,16 +19,17 @@ package org.runnerup.util;
 
 import static org.runnerup.util.Formatter.Format.TXT_SHORT;
 
-import android.annotation.SuppressLint;
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Color;
 import android.health.connect.datatypes.HeartRateRecord;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import java.util.LinkedList;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.osmdroid.api.IMapController;
 import org.osmdroid.config.Configuration;
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory;
@@ -37,23 +38,26 @@ import org.osmdroid.views.CustomZoomButtonsController;
 import org.osmdroid.views.MapView;
 import org.osmdroid.views.overlay.Marker;
 import org.osmdroid.views.overlay.Polyline;
-import org.runnerup.R;
 import org.runnerup.common.util.Constants;
 import org.runnerup.db.entities.LocationEntity;
 
 public class MapWrapper implements Constants {
 
-  private final Context context;
   private final SQLiteDatabase mDB;
   private final long mID;
   private final Formatter formatter;
   private final MapView mapView;
 
-  private static final String OSMDROID_USER_AGENT = "org.runnerup.free";
+  private final ExecutorService executor = Executors.newSingleThreadExecutor();
+
+  private static final java.lang.String OSMDROID_USER_AGENT = "org.runnerup.free";
 
   public MapWrapper(
-      Context context, SQLiteDatabase mDB, long mID, Formatter formatter, Object mapView) {
-    this.context = context;
+      Context context,
+      SQLiteDatabase mDB,
+      long mID,
+      Formatter formatter,
+      java.lang.Object mapView) {
     this.mDB = mDB;
     this.mID = mID;
     this.formatter = formatter;
@@ -71,10 +75,7 @@ public class MapWrapper implements Constants {
 
     Configuration.getInstance().setUserAgentValue(OSMDROID_USER_AGENT);
 
-    IMapController iMapController = mapView.getController();
-    iMapController.setZoom(15.);
-
-    new LoadRoute().execute(new LoadParam(context, mDB, mID, mapView, iMapController));
+    loadRouteAsync();
   }
 
   class Route {
@@ -95,26 +96,14 @@ public class MapWrapper implements Constants {
     List<Marker> markers = new ArrayList<>(2);
   }
 
-  private class LoadParam {
-    LoadParam(
-        Context context,
-        SQLiteDatabase mDB,
-        long mID,
-        MapView mapView,
-        IMapController iMapController) {
-      this.context = context;
-      this.mDB = mDB;
-      this.mID = mID;
-      this.mapView = mapView;
-      this.iMapController = iMapController;
-    }
+  /** The long-running database query and data processing logic. */
+  private Route loadRouteData() {
+    Polyline polyline = new Polyline(mapView, true);
+    polyline.setInfoWindow(null);
+    polyline.getOutlinePaint().setStrokeWidth(10.f);
 
-    final Context context;
-    final SQLiteDatabase mDB;
-    final long mID;
-    final MapView mapView;
-    final IMapController iMapController;
-  }
+    java.util.List<Marker> markers = new ArrayList<>();
+    java.util.List<GeoPoint> points = new LinkedList<>();
 
   @SuppressLint("StaticFieldLeak")
   private class LoadRoute extends AsyncTask<LoadParam, Void, Route> {
@@ -206,6 +195,11 @@ public class MapWrapper implements Constants {
         //Log.v(getClass().getName(), "Added " + route.markers.size() + " markers");
       }
     }
+    ll.close();
+    polyline.setPoints(points);
+
+    GeoPoint firstPoint = points.isEmpty() ? null : points.get(0);
+    return new Route(polyline, markers, firstPoint);
   }
 
   public void onResume() {
@@ -224,5 +218,7 @@ public class MapWrapper implements Constants {
 
   public void onLowMemory() {}
 
-  public void onDestroy() {}
+  public void onDestroy() {
+    executor.shutdown();
+  }
 }

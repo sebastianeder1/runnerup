@@ -22,7 +22,6 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.util.Log;
 import androidx.core.content.ContextCompat;
-import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import org.runnerup.common.util.Constants;
 import org.runnerup.tracker.Tracker;
 import org.runnerup.workout.Workout;
@@ -67,14 +66,6 @@ public class TrackerReceiver extends DefaultTrackerComponent {
         }
       };
 
-  private final BroadcastReceiver mLocalBroadcastReceiver =
-      new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-          TrackerReceiver.this.onReceive(context, intent);
-        }
-      };
-
   private void onReceive(Context context, Intent intent) {
     String action = intent.getAction();
     switch (tracker.getState()) {
@@ -94,6 +85,9 @@ public class TrackerReceiver extends DefaultTrackerComponent {
 
     Workout workout = tracker.getWorkout();
     if (workout == null) return;
+
+    // Ensure database is available if we receive an action that might cause activity saving/pausing
+    tracker.getDatabase();
 
     if (Constants.Intents.PAUSE_RESUME.contentEquals(action)) {
       if (workout.isPaused()) workout.onResume(workout);
@@ -115,8 +109,6 @@ public class TrackerReceiver extends DefaultTrackerComponent {
     intentFilter.addAction(Constants.Intents.RESUME_WORKOUT);
     intentFilter.addAction(Constants.Intents.NEW_LAP);
     intentFilter.addAction(Constants.Intents.PAUSE_RESUME);
-    LocalBroadcastManager.getInstance(context)
-        .registerReceiver(mLocalBroadcastReceiver, intentFilter);
     ContextCompat.registerReceiver(
         context, mBroadcastReceiver, intentFilter, ContextCompat.RECEIVER_NOT_EXPORTED);
   }
@@ -124,11 +116,6 @@ public class TrackerReceiver extends DefaultTrackerComponent {
   private void unregisterReceivers() {
     try {
       context.unregisterReceiver(mBroadcastReceiver);
-    } catch (Exception e) {
-      e.printStackTrace();
-    }
-    try {
-      LocalBroadcastManager.getInstance(context).unregisterReceiver(mLocalBroadcastReceiver);
     } catch (Exception e) {
       e.printStackTrace();
     }

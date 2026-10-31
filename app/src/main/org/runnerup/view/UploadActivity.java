@@ -17,7 +17,6 @@
 
 package org.runnerup.view;
 
-import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
@@ -28,6 +27,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
+import android.view.Window;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
@@ -35,9 +35,13 @@ import android.widget.CompoundButton.OnCheckedChangeListener;
 import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
+import androidx.activity.EdgeToEdge;
 import androidx.activity.OnBackPressedCallback;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.content.res.AppCompatResources;
+import androidx.core.view.WindowCompat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -71,10 +75,17 @@ public class UploadActivity extends AppCompatActivity implements Constants {
 
   private boolean fetching = false;
   private final StringBuffer cancelSync = new StringBuffer();
+  private final ActivityResultLauncher<Intent> detailActivityLauncher =
+      registerForActivityResult(
+          new ActivityResultContracts.StartActivityForResult(), result -> fillData());
 
   /** Called when the activity is first created. */
   @Override
   public void onCreate(Bundle savedInstanceState) {
+    EdgeToEdge.enable(this);
+    Window window = getWindow();
+    WindowCompat.getInsetsController(window, window.getDecorView())
+        .setAppearanceLightStatusBars(false);
     super.onCreate(savedInstanceState);
     setContentView(R.layout.upload);
 
@@ -291,7 +302,7 @@ public class UploadActivity extends AppCompatActivity implements Constants {
         Intent intent = new Intent(UploadActivity.this, DetailActivity.class);
         intent.putExtra("ID", id);
         intent.putExtra("mode", "details");
-        startActivityForResult(intent, 100);
+        detailActivityLauncher.launch(intent);
       };
 
   class UploadListAdapter extends BaseAdapter {
@@ -328,7 +339,6 @@ public class UploadActivity extends AppCompatActivity implements Constants {
       private long activityID;
     }
 
-    @SuppressLint("ObsoleteSdkInt")
     @Override
     public View getView(int arg0, View convertView, ViewGroup parent) {
       View view = convertView;
@@ -498,9 +508,4 @@ public class UploadActivity extends AppCompatActivity implements Constants {
         updateSyncCount();
         requery();
       };
-
-  public void onActivityResult(int requestCode, int resultCode, Intent data) {
-    super.onActivityResult(requestCode, resultCode, data);
-    fillData();
-  }
 }

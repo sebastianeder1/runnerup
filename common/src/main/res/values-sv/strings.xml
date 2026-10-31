@@ -1,23 +1,24 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <resources xmlns:tools="http://schemas.android.com/tools">
   <!--~ Copyright (C) 2014 jonas.oreland@gmail.com
-  ~
-  ~  This program is free software: you can redistribute it and/or modify
-  ~  it under the terms of the GNU General Public License as published by
-  ~  the Free Software Foundation, either version 3 of the License, or
-  ~  (at your option) any later version.
-  ~
-  ~  This program is distributed in the hope that it will be useful,
-  ~  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  ~  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  ~  GNU General Public License for more details.
-  ~
-  ~  You should have received a copy of the GNU General Public License
-  ~  along with this program.  If not, see <http://www.gnu.org/licenses/>.-->
+    ~
+    ~  This program is free software: you can redistribute it and/or modify
+    ~  it under the terms of the GNU General Public License as published by
+    ~  the Free Software Foundation, either version 3 of the License, or
+    ~  (at your option) any later version.
+    ~
+    ~  This program is distributed in the hope that it will be useful,
+    ~  but WITHOUT ANY WARRANTY; without even the implied warranty of
+    ~  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    ~  GNU General Public License for more details.
+    ~
+    ~  You should have received a copy of the GNU General Public License
+    ~  along with this program.  If not, see <http://www.gnu.org/licenses/>.-->
   <!--metrics stuff-->
   <string name="metrics_distance_km">km</string>
   <string name="metrics_distance_mi">mi</string>
   <string name="metrics_distance_m">m</string>
+  <string name="metrics_distance_ft">fot</string>
   <string name="metrics_elapsed_h">h</string>
   <string name="metrics_elapsed_m">m</string>
   <string name="metrics_elapsed_min">min</string>
@@ -35,6 +36,7 @@
   <string name="cool_down">nedvarvning</string>
   <string name="repeat">Upprepning</string>
   <string name="repeat_times">Upprepa %1$d gånger</string>
+  <string name="Time">Tid</string>
   <string name="time">tid</string>
   <string name="distance">distans</string>
   <string name="Distance">Distans</string>
@@ -49,12 +51,14 @@
   <string name="Start_hour">Starttid</string>
   <string name="Heart_rate">Puls</string>
   <string name="Pace">Tempo</string>
+  <string name="Elevation">Höjd</string>
   <string name="Scan">Skanna</string>
   <string name="Connect">Anslut</string>
   <string name="Connecting">Ansluter</string>
   <string name="Download">Ladda ner</string>
   <string name="Share">Dela</string>
   <string name="Edit">Ändra</string>
+  <string name="Rename">Byt namn</string>
   <string name="Delete">Ta bort</string>
   <string name="Total">Total</string>
   <string name="Interval">Intervall</string>
@@ -81,6 +85,7 @@
   <string name="GPS_level_acceptable">Acceptabel GPS</string>
   <string name="GPS_level_good">Bra GPS</string>
   <string name="Start_GPS">Starta GPS</string>
+  <string name="Start_tracker">Starta tracker</string>
   <string name="Duration">Varaktighet</string>
   <string name="Cancel">Avbryt</string>
   <string name="value">värde</string>
@@ -124,6 +129,10 @@
   <string name="Clear_heart_rate_zone_settings">Rensa inställningar för pulszon</string>
   <string name="Manage_audio_cues">Hantera ljudmeddelanden</string>
   <string name="Manage_workouts">Hantera träningspass</string>
+  <string name="Enter_new_workout_name">Skriv det nya träningspassets namn</string>
+  <string name="Invalid_workout_name">Oglitligt namn på träningspasset</string>
+  <string name="New_workout_name_is_the_same_as_the_old_one">Det nya namnet på träningspasset är samma som det gamla</string>
+  <string name="Workout_name_already_in_use">Namnet på träningspasset används redan</string>
   <string name="Settings">Inställningar</string>
   <string name="Whats_new">Nyheter</string>
   <string name="Rate_RunnerUp">Recensera RunnerUp</string>
@@ -146,6 +155,7 @@
   <string name="Saving">Sparar</string>
   <string name="Cancellingplease_wait">Avbryter, vänta…</string>
   <string name="Are_you_sure">Är du säker?</string>
+  <string name="Delete_audio_cue">Ta bort ljudmeddelande?</string>
   <string name="Configure_audio_cues">Konfigurera ljudmeddelanden</string>
   <string name="Downloadeditremove_workouts">Ändra träningspass</string>
   <string name="Convert_reststep_with_type_distance_to_recoverystep_for_Intervaltab">För Interval-tabben, använd Återhämting för Vila (paus) steg</string>
@@ -188,13 +198,14 @@
   <string name="Smooth_pace_filters">Utjämningsfilter tempo (s)</string>
   <string name="Poll_interval_ms">GPS Uppdaterings intervall (ms)</string>
   <string name="Poll_distance_m">GPS Uppdaterings distans (m)</string>
-  <string name="Adjust_altitude">Justera GPS höjd till geoid (EGM96)</string>
+  <string name="Adjust_altitude">Justera GPS höjd till geoid (EGM2008)</string>
   <string name="Export">Exportera</string>
   <string name="Import">Importera</string>
   <string name="Experimental_HRM_devices">Experimentella pulsmätare</string>
   <string name="Paired_BLE_devices">Parkopplade BLE enheter</string>
   <string name="Experimental_features">Experimentella funktioner</string>
   <string name="Mock_HRM_devices">Sken-pulsmätare</string>
+  <string name="Debug_HRM">Debugga HR</string>
   <string name="About_RunnerUp">Om RunnerUp</string>
   <string name="Triggers">Starta ljud vid</string>
   <string name="Time_triggered_audio_cue">Tid trigger</string>
@@ -287,7 +298,7 @@
   <string name="Request_permission_text">Tillåt behörighet genom att klicka OK.</string>
   <string name="Battery_optimization_check">Batterioptimering aktiverad</string>
   <string name="Battery_optimization_check_text">Batterioptimering minskar noggrannheten.\nVälj OK för att gå till inställningar, välj \"Alla appar\", sök efter \"RunnerUp\", välj \"Optimera inte\".</string>
-  <string name="Battery_optimization_check_text_Android9">Batterioptimering kan få Android att stoppa inspelningar.\nVälj OK för att gå till app inställningar, välj \"Batteri användning\", välj \"Optimera inte\" eller \"Tillåt bakgrundsaktivitet\".</string>
+  <string name="Battery_optimization_check_text_Android9">Batterioptimering kan få Android att stoppa inspelningar som kör i bakgrunden.\nVälj OK för att gå till app inställningar, välj \\"Batteri användning\\", välj \\"Tillåt bakgrundsaktivitet\\", välj \\"Optimera inte\\" eller \\"Obegränsad\\".</string>
   <string name="Default">Standard</string>
   <string name="Notes_about_your_workout">Anteckningar om träningspasset</string>
   <string name="Downloading_from_1s">Laddar ner från %1$s</string>
@@ -312,13 +323,13 @@
   <string name="use_temperature_sensor">Temperatursensor</string>
   <string name="use_pressure_sensor_title">Trycksensor</string>
   <string name="use_pressure_sensor_summary">Använd barometer för höjd</string>
-  <string name="adjust_barometer_altitude_from_gps">Justera barometerhöjd till GPS höjd</string>
-  <string name="adjust_barometer_elevation_from_gps_summary">Använd GPS-höjd vid start för att sätta starthöjd</string>
   <string name="channel_notification_ongoing">RunnerUp GPS och aktivtets notifikationer</string>
   <string name="Lap_start">Varv start</string>
   <string name="Lap_start_summary">Meddelande vid start av varv och Aktiv, Uppvärmning och Nedvarvning steg</string>
   <string name="Lock_activity_buttons">Lås aktivitetsknappar</string>
-  <string name="Lock_activity_buttons_message">Lås aktivitetsknappar genom att knacka på tabellhuvudet</string>
+  <string name="Lock_activity_buttons_message">Byt låsmod för stop/pause med att knacka snabbt på skärmen</string>
+  <string name="Volume_button_controls">Volym knappar</string>
+  <string name="Volume_button_controls_summary">Använd volym upp för att skapa varv och volym ner för att pausa</string>
   <string name="Speed">Hastighet</string>
   <string name="Speed_unit_preference">Hastighetsenhet</string>
   <string name="path_simplification">GPS-spår förenkling</string>
@@ -338,15 +349,16 @@
   <!--Preference categories & summaries-->
   <string name="GPS_category">GPS</string>
   <string name="HRM_category">Puls</string>
-  <string name="Lock_activity_buttons_category">Lås aktivitetsknappar</string>
+  <string name="Buttons_category">Knappar</string>
   <string name="GPS_recording_category">GPS inspelning</string>
   <string name="Phone_sensors_category">Telefon sensorer</string>
   <string name="Database_category">Databasunderhåll</string>
-  <string name="Maintenance_explanation_summary">RunnerUp sparar aktiviteter i en SQL databas.\nFilen runnerup.db.export kan importeras och exporteras från \n%1$s</string>
+  <string name="Maintenance_explanation_summary_v2">RunnerUp sparar aktiviteter i en SQL databas som kan importeras och exporteras.</string>
   <string name="Map_pref_summary">Karttyp</string>
-  <string name="Controls">Kontroller</string>
-  <string name="Controls_pref_summary">Lås aktivitetsknappar</string>
+  <string name="User_interface">Användarinterface</string>
+  <string name="User_interface_pref_summary">Knappar och synlighet</string>
   <string name="Workout_pref_summary">Hantera träningspass, varv och målcoachning</string>
+  <string name="Visibility_category">Synlighet</string>
   <string name="Manage_workouts_category">Avancerat träningspass</string>
   <string name="Autolap_category">Autovarv</string>
   <string name="Autopause_category">Autopaus</string>
@@ -358,4 +370,22 @@
   <string name="Current_speed_from_GPS_points_summary">Hastighet från GPS sensorn istället för att beräkna från GPS punkter</string>
   <string name="Target_coaching_summary">Set period för att beräkna rullande medelvärde för återkoppling och anståndstid för ljudmeddelanden</string>
   <string name="Activity_ongoing">Aktivitet pågår</string>
+  <string name="Activity_paused">Aktivitet pausad</string>
+  <string name="Activity_stopped">Aktivitet stoppad</string>
+  <string name="Show_on_lock_screen">Visa på låsskärmen</string>
+  <string name="Show_on_lock_screen_summary">Visa aktivitet på låsskärmen då enheten är låst</string>
+  <string name="Keep_screen_on">Håll skärm på</string>
+  <string name="Keep_screen_on_summary">Håll skärm på då inspelning pågår</string>
+  <!--Name of sports, these deprecate array.sportEntries-->
+  <string name="SPORT_RUNNING">Löpning</string>
+  <string name="SPORT_BIKING">Cykel</string>
+  <string name="SPORT_OTHER">Annat</string>
+  <string name="SPORT_ORIENTEERING">Orientering</string>
+  <string name="SPORT_WALKING">Gång</string>
+  <string name="SPORT_TREADMILL">Löpband</string>
+  <string name="SPORT_GYM">Gym</string>
+  <string name="SPORT_STATIONARY_BIKE">Träningscykel</string>
+  <string name="import_cancelled">Import avbruten</string>
+  <string name="export_cancelled">Export avbruten</string>
+  <string name="import_error_invalid_database">Den valda filen är inte en giltlig RunnerUp databas!</string>
 </resources>

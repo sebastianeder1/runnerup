@@ -99,11 +99,8 @@ public class EndurainSynchronizer extends DefaultSynchronizer {
     if (authToken != null) {
       try {
         JSONObject tmp = new JSONObject(authToken);
-        //noinspection ConstantConditions
         username = tmp.optString("username", null);
-        //noinspection ConstantConditions
         password = tmp.optString("password", null);
-        //noinspection ConstantConditions
         url = tmp.optString("url", null);
         hasCorrectConfig = tmp.optBoolean("hasCorrectConfig", false);
       } catch (JSONException e) {
@@ -264,7 +261,7 @@ public class EndurainSynchronizer extends DefaultSynchronizer {
                   "file",
                   (fileBase.replace("/", "") + fileExt),
                   RequestBody.create(
-                      MediaType.parse("application/" + fileExt + "+xml"), writer.toString()))
+                      writer.toString(), MediaType.parse("application/" + fileExt + "+xml")))
               .build();
 
       Request request =
